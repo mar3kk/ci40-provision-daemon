@@ -1,0 +1,48 @@
+
+
+
+<% if table.getn(clickers["clickers"]) == 0 then %>
+<div class="alert alert-info">
+    No clickers connected to provisioning daemon.
+</div>
+<% end %>
+
+<table class="table table-striped">
+<tr>
+  <th>Clicker name</th>
+
+  <th></th>
+  <th></th>
+</tr>
+<% for i = 1, table.getn(clickers["clickers"]) do %>
+<% local clicker = clickers["clickers"][i]; %>
+<tr>
+  <td>
+      <% if clicker["selected"] then %>
+      <strong>
+      <% end %>
+      <%=clicker["name"] %>
+      <% if clicker["selected"] then %>
+      </strong>
+      <% end %>
+  </td>
+  <td>
+      <% if (not clicker["isProvisioned"] and not clicker["inProvisionState"]) then %>
+      <a onclick='selectClicker( <%=clicker["id"]%> );return;' href="#">Select</a>
+      <% end %>
+  </td>
+  <td>
+      <% if clicker["inProvisionState"] then %>
+        <img src="/luci-static/resources/creator/gfx/cog-loader.gif" />
+      <% else %>
+        <% if clicker["selected"] then %>
+            <a onclick='startProvisioning( <%=clicker["id"]%> )' href="#">Start provisioning</a>
+        <% elseif clicker["isProvisioned"] then %>
+            <img src="/luci-static/resources/creator/gfx/ic_done_black_24dp_1x.png" />
+        <% end %>
+      <% end %>
+  </td>
+</tr>
+<% end %>
+</table>
+</div>

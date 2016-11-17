@@ -1,0 +1,119 @@
+<%+header%>
+<script type="text/javascript" src="/luci-static/resources/creator/js/jquery-3.1.1.js"></script>
+<link rel="stylesheet" href="/luci-static/resources/creator/bootstrap/css/bootstrap-iso.css">
+<link rel="stylesheet" href="/luci-static/resources/creator/css/styles.css">
+<script src="/luci-static/resources/creator/bootstrap/js/bootstrap.min.js"></script>
+<div class="bootstrap-isolation">
+
+<div class="row">
+    <div class="col-lg-12 text-right">
+        <% if not isProvisioningDaemonRunning then %>
+            <a class="btn btn-default text-right" onclick="startDaemon();return;">Start Provisioning Daemon</a>
+        <% else %>
+            <a class="btn btn-default text-right" onclick="stopDaemon();return;">Stop Provisioning Daemon</a>
+        <% end %>
+    </div>
+</div>
+<br />
+
+<% if warning then %>
+<div class="alert alert-danger">
+    <%= warning %>
+</div>
+<% end %>
+
+<div id="clicker_list">
+</div>
+
+
+<div class="modal" tabindex="-1" role="dialog" id="alert-modal">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <!--<div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+        <h4 class="modal-title">Modal title</h4>
+    </div>-->
+      <div class="modal-body">
+        <div class="row">
+            <div class="col-lg-12" id="alert-modal-body">
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-lg-12 text-right">
+                <button type="button" class="btn btn-primary" data-dismiss="modal">Close</button>
+            </div>
+        </div>
+
+      </div>
+
+    </div><!-- /.modal-content -->
+  </div><!-- /.modal-dialog -->
+</div><!-- /.modal -->
+</div>
+
+<%+footer%>
+
+<script>
+function getConnectedClickers(){
+    $.post('provisioning/clicker_list', function(data) {
+        $("#clicker_list").html(data);  // process results here
+
+    });
+}
+getConnectedClickers();
+setInterval("getConnectedClickers()", 2000);
+
+function startProvisioning(clickerID) {
+    $.post('provisioning/start_provisioning',{clickerID : clickerID}, function(data) {
+
+    })
+    .fail(function(jqXHR, textStatus, errorThrown) {
+        showModalError(errorThrown);
+    })
+    .done(function() {
+        getConnectedClickers();
+    });
+}
+
+function selectClicker(clickerID) {
+    $.post('provisioning/select_clicker',{clickerID : clickerID}, function(data) {
+
+    })
+    .fail(function(jqXHR, textStatus, errorThrown) {
+        showModalError(errorThrown);
+    })
+    .done(function() {
+        getConnectedClickers();
+    });
+}
+
+function showModalError(msg) {
+    $("#alert-modal-body").html(msg);
+    $("#alert-modal").modal('show');
+}
+
+function startDaemon() {
+    $.post('provisioning/start_daemon', function(data) {
+
+    })
+    .fail(function(jqXHR, textStatus, errorThrown) {
+        showModalError(errorThrown);
+    })
+    .done(function() {
+        location.reload();
+    });
+}
+
+function stopDaemon() {
+    $.post('provisioning/stop_daemon', function(data) {
+
+    })
+    .fail(function(jqXHR, textStatus, errorThrown) {
+        showModalError(errorThrown);
+    })
+    .done(function() {
+        location.reload();
+    });
+}
+
+</script>
