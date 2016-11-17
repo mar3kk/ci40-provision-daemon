@@ -1,0 +1,6 @@
+/src/provisioning_daemon_appd
+.cproject
+.project
+.settings/**
+Debug/**
+**/.remote-sync.json
