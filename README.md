@@ -1,7 +1,10 @@
 ![](http://static.creatordev.io/logo.png)
 # Provision Daemon for ci40 board.
 
-This project provides daemon which provides PSK and configuration needed by constrained device to be provisioned on [Device Server](http://creatordev.io/). This code cooperates with [Onboarding Scripts](http://properLinkHere) and [Provision Library](http://properLinkHere) which are separate project, more information about whole solution can be find [here](http://properLinkHere)
+Visit us at [forum.creatordev.io](http://forum.creatordev.io) for support and discussion
+
+
+This project provides daemon which provides PSK and configuration needed by constrained device to be provisioned on [Device Server](http://creatordev.io/). This code cooperates with [Onboarding Scripts](https://github.com/CreatorDev/ci40-onboarding-scripts) and [Provision Library](https://github.com/CreatorDev/contiki-provisioning-library) which are separate project, more information about whole solution can be find [here](http://properLinkHere)
 
 ## Pre requirements
 To have this daemon working in proper way you have to ensure following things:
@@ -23,7 +26,7 @@ Most of daemon configuration is done through config file located at `/etc/config
 -l path - Set path which includes directory + file name in which logs should be stored.
 -c path - Set path for configuration file.
 -d - Run as daemon.
--r - Same as setting REMOTE_PROVISION_CTRL to true 
+-r - Same as setting REMOTE_PROVISION_CTRL to true
 ```
 
 Options which can be set in configuration file:
@@ -80,4 +83,7 @@ After setting value of `LOCAL_PROVISION_CTRL` to `1` it's possible to control pr
     * Problems with Device Server communication (timeout, can't be reached)
 
 ## Usage with Mobile application
-To work with mobile application your smartphone needs to be in this same network as ci40 board. If in your config file parameter `REMOTE_PROVISION_CTRL` is set to `1`. You will be able to control process of provisioning from application. Please refer to documentation of project [Android Onboard App](http://properLinkHere) for more information.
+To work with mobile application your smartphone needs to be in this same network as ci40 board. If in your config file parameter `REMOTE_PROVISION_CTRL` is set to `1`. You will be able to control process of provisioning from application. Please refer to documentation of project [Android Onboard App](https://github.com/CreatorDev/android-provisioning-onboard-app) for more information.
+
+## Contributing
+If you have a contribution to make please follow the processes laid out in [contributor guide](CONTRIBUTING.md).
