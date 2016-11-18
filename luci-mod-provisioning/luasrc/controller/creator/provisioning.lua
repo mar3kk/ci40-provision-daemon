@@ -23,14 +23,14 @@ function creator_provisioning()
     luci.http.prepare_content("text/html")
     local warning = nil;
     local isProvisioningDaemonRunning = true
+    local isBoardProvisioned = true
     local status = conn:call("provisioning-daemon", "getState", {})
-    if not onboarding.isOnboardingCompleted() then
-        warning = "You must go through onboarding process first in order to start provisioning clickers"
-    elseif status == nil then
+    isBoardProvisioned = onboarding.isOnboardingCompleted()
+    if status == nil then
         isProvisioningDaemonRunning = false
-        warning = "Provisioning daemon is not runnig. Please start it first in order to start provisioning."
+
     end
-    luci.template.render("creator_provisioning/provisioning", {warning=warning, isProvisioningDaemonRunning=isProvisioningDaemonRunning})
+    luci.template.render("creator_provisioning/provisioning", {isBoardProvisioned=isBoardProvisioned, isProvisioningDaemonRunning=isProvisioningDaemonRunning})
 
 end
 
