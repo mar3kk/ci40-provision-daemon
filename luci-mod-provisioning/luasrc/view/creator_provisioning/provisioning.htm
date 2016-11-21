@@ -16,9 +16,13 @@
 </div>
 <br />
 
-<% if warning then %>
+<% if not isBoardProvisioned then %>
 <div class="alert alert-danger">
-    <%= warning %>
+    This board hasn't completed onboarding process yet. Please do onboarding first.
+</div>
+<% elseif not isProvisioningDaemonRunning then %>
+<div class="alert alert-danger">
+    Provisioning daemon isn't ranning on this Ci40. Please start it first
 </div>
 <% end %>
 
@@ -60,8 +64,10 @@ function getConnectedClickers(){
 
     });
 }
+<% if (isProvisioningDaemonRunning and isBoardProvisioned) then %>
 getConnectedClickers();
 setInterval("getConnectedClickers()", 2000);
+<% end %>
 
 function startProvisioning(clickerID) {
     $.post('provisioning/start_provisioning',{clickerID : clickerID}, function(data) {
