@@ -1,17 +1,23 @@
 <%+header%>
-<script type="text/javascript" src="/luci-static/resources/creator/js/jquery-3.1.1.js"></script>
-<link rel="stylesheet" href="/luci-static/resources/creator/bootstrap/css/bootstrap-iso.css">
-<link rel="stylesheet" href="/luci-static/resources/creator/css/styles.css">
-<script src="/luci-static/resources/creator/bootstrap/js/bootstrap.min.js"></script>
+<%+creator_onboarding/creator_include%>
+<link rel="stylesheet" href="/luci-static/resources/creator/css/provisioning.css">
 <div class="bootstrap-isolation">
 
-<div class="row">
-    <div class="col-lg-12 text-right">
+<div class="row" style="margin-top:20px;margin-bottom:30px;">
+    <div class="col-lg-8">
+        <h3 style="margin:0px;">Provisioning</h3>
+    </div>
+    <div class="col-lg-3 text-right">
+        <p style="color:$787878;margin:0px;">PROVISIONING DAEMON</p>
+    </div>
+    <div class="col-lg-1 text-right">
+        <% local checked = "checked" %>
         <% if not isProvisioningDaemonRunning then %>
-            <a class="btn btn-default text-right" onclick="startDaemon();return;">Start Provisioning Daemon</a>
-        <% else %>
-            <a class="btn btn-default text-right" onclick="stopDaemon();return;">Stop Provisioning Daemon</a>
+        <% checked = "" %>
         <% end %>
+        <input type="checkbox" id="unchecked" class="cbx hidden" <%=checked %> onclick="startStopDaemon();return;"/>
+        <label for="unchecked" class="lbl"></label>
+
     </div>
 </div>
 <br />
@@ -25,7 +31,8 @@
 <div id="clicker_list">
 </div>
 
-
+<%+creator_onboarding/loading_modal%>
+<%+creator_onboarding/alert_modal%>
 <div class="modal" tabindex="-1" role="dialog" id="alert-modal">
   <div class="modal-dialog" role="document">
     <div class="modal-content">
@@ -64,25 +71,31 @@ getConnectedClickers();
 setInterval("getConnectedClickers()", 2000);
 
 function startProvisioning(clickerID) {
+    showLoadingModal("Starting provisioning process...");
     $.post('provisioning/start_provisioning',{clickerID : clickerID}, function(data) {
 
     })
     .fail(function(jqXHR, textStatus, errorThrown) {
+        hideLoadingModal();
         showModalError(errorThrown);
     })
     .done(function() {
+        hideLoadingModal();
         getConnectedClickers();
     });
 }
 
 function selectClicker(clickerID) {
+    showLoadingModal("Selecting clicker...");
     $.post('provisioning/select_clicker',{clickerID : clickerID}, function(data) {
 
     })
     .fail(function(jqXHR, textStatus, errorThrown) {
+        hideLoadingModal();
         showModalError(errorThrown);
     })
     .done(function() {
+        hideLoadingModal();
         getConnectedClickers();
     });
 }
@@ -113,6 +126,24 @@ function stopDaemon() {
     })
     .done(function() {
         location.reload();
+    });
+}
+
+function startStopDaemon() {
+    showLoadingModal("Starting / stopping provisioning daemon");
+    $.post('provisioning/start_stop_daemon', function(data) {
+
+    })
+    .fail(function(jqXHR, textStatus, errorThrown) {
+        hideLoadingModal();
+        showModalError(errorThrown);
+    })
+    .done(function() {
+        setTimeout(function() {
+            hideLoadingModal();
+            location.reload();
+        },1000);
+
     });
 }
 

@@ -16,6 +16,7 @@ function index()
     entry({"admin", "creator", "provisioning", "select_clicker"}, call("select_clicker"), nil, nil).dependent=false
     entry({"admin", "creator", "provisioning", "start_daemon"}, call("start_daemon"), nil, nil).dependent=false
     entry({"admin", "creator", "provisioning", "stop_daemon"}, call("stop_daemon"), nil, nil).dependent=false
+    entry({"admin", "creator", "provisioning", "start_stop_daemon"}, call("start_stop_daemon"), nil, nil).dependent=false
 end
 
 
@@ -80,4 +81,14 @@ function stop_daemon()
     else
         luci.http.status(500, "Cannot stop provisioning-daemon");
     end
+end
+
+function start_stop_daemon()
+    local status = conn:call("provisioning-daemon", "getState", {})
+    if (status == nil) then
+        start_daemon();
+    else
+        stop_daemon();
+    end
+
 end
