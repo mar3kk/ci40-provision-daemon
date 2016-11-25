@@ -26,9 +26,13 @@
 <div class="alert alert-danger">
     This board hasn't completed onboarding process yet. Please do onboarding first.
 </div>
-<% elseif not isProvisioningDaemonRunning then %>
+<% elseif not isBoardConnected then %>
 <div class="alert alert-danger">
-    Provisioning daemon isn't ranning on this Ci40. Please start it first
+    This Ci40 is not connect to Device Server. Cannot provision clickers.
+</div>
+<% elseif not isProvisioningDaemonRunning then %>
+<div class="alert alert-warning">
+    Provisioning daemon isn't running on this Ci40. Please start it first
 </div>
 <% end %>
 

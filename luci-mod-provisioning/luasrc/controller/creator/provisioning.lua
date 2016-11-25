@@ -25,13 +25,17 @@ function creator_provisioning()
     local warning = nil;
     local isProvisioningDaemonRunning = true
     local isBoardProvisioned = true
+    local isBoardConnected = false
     local status = conn:call("provisioning-daemon", "getState", {})
     isBoardProvisioned = onboarding.isOnboardingCompleted()
+    if (isBoardProvisioned) then
+        isBoardConnected = onboarding.isBoardConnectedToDeviceServer()
+    end
     if status == nil then
         isProvisioningDaemonRunning = false
 
     end
-    luci.template.render("creator_provisioning/provisioning", {isBoardProvisioned=isBoardProvisioned, isProvisioningDaemonRunning=isProvisioningDaemonRunning})
+    luci.template.render("creator_provisioning/provisioning", {isBoardProvisioned=isBoardProvisioned, isBoardConnected = isBoardConnected, isProvisioningDaemonRunning=isProvisioningDaemonRunning})
 
 end
 
