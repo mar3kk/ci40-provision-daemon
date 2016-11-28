@@ -1,10 +1,21 @@
 ![](http://static.creatordev.io/logo.png)
+
 # Provision Daemon for ci40 board.
 
 Visit us at [forum.creatordev.io](http://forum.creatordev.io) for support and discussion
 
 
 This project provides daemon which provides PSK and configuration needed by constrained device to be provisioned on [Device Server](http://creatordev.io/). This code cooperates with [Onboarding Scripts](https://github.com/CreatorDev/ci40-onboarding-scripts) and [Provision Library](https://github.com/CreatorDev/contiki-provisioning-library) which are separate project, more information about whole solution can be find [here](http://properLinkHere)
+
+## Build status
+
+Master
+[![Build Status](https://travis-ci.org/CreatorDev/ci40-provision-daemon.svg?branch=master)](https://github.com/CreatorDev/ci40-provision-daemon)
+
+
+Dev
+[![Build Status](https://travis-ci.org/CreatorDev/ci40-provision-daemon.svg?branch=dev)](https://github.com/CreatorDev/ci40-provision-daemon)
+
 
 ## Pre requirements
 To have this daemon working in proper way you have to ensure following things:
