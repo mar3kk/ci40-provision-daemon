@@ -163,7 +163,7 @@ Clicker *clicker_New(int socket)
     newClicker->psk = NULL;
     newClicker->ownershipsCount = 0;
     newClicker->provisionTime = 0;
-    newClicker->error = 0;
+	newClicker->error = 0;
     newClicker->provisioningInProgress = false;
 	newClicker->name = malloc(COMMAND_ENDPOINT_NAME_LENGTH);
 

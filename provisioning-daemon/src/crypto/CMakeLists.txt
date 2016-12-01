@@ -1,4 +1,5 @@
 set(crypto_source_files
+  crypto_config.c
   bigint.c
   rijndael.c
   encoder.c

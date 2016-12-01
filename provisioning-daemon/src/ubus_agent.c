@@ -161,7 +161,7 @@ static int GetStateMethodHandler(struct ubus_context *ctx, struct ubus_object *o
         blobmsg_add_u8(&replyBloob, "selected", false);
         blobmsg_add_u8(&replyBloob, "inProvisionState", false);
         blobmsg_add_u8(&replyBloob, "isProvisioned", true);
-
+        blobmsg_add_u8(&replyBloob, "isError", false);
         blobmsg_close_table(&replyBloob, cookie_item);
     }
 
@@ -191,6 +191,7 @@ static int GetStateMethodHandler(struct ubus_context *ctx, struct ubus_object *o
         blobmsg_add_u8(&replyBloob, "selected", clk->clickerID == selClickerId);
         blobmsg_add_u8(&replyBloob, "inProvisionState", clk->provisioningInProgress);
         blobmsg_add_u8(&replyBloob, "isProvisioned", false);
+        blobmsg_add_u8(&replyBloob, "isError", clk->error > 0 ? true : false);
 
         blobmsg_close_table(&replyBloob, cookie_item);
 

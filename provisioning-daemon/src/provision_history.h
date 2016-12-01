@@ -31,17 +31,20 @@
 #ifndef __PROVISION_HISTORY_H__
 #define __PROVISION_HISTORY_H__
 #include <stdbool.h>
+#include "crypto/crypto_config.h"
 
 #define MAX_HISTORY_NAME 40
 
 typedef struct {
     int id;
     char name[MAX_HISTORY_NAME];
+    uint8_t remoteKey[P_MODULE_LENGTH];
+    bool isErrored;
 } HistoryItem;
 
 void history_init();
 void history_destroy();
-void history_AddAsProvisioned(int id, char* name);
+void history_AddAsProvisioned(int id, char* name, uint8_t* remoteKey, int keyLength);
 void history_GetProvisioned(HistoryItem** listOfId, int* sizeOfList);
 void history_RemoveProvisioned(int id);
 

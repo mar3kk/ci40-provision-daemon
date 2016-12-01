@@ -35,6 +35,7 @@
 #include <string.h>
 #include <semaphore.h>
 #include "provision_history.h"
+#include "log.h"
 
 //10 minutes
 #define MAX_LIVE_TIME  (10 * 60 * 1000)
@@ -43,7 +44,9 @@ typedef struct HistoryEntry_ {
     struct HistoryEntry_* next;
     char name[MAX_HISTORY_NAME];
     long timestamp;
+    uint8_t remoteKey[P_MODULE_LENGTH];
     int id;
+    bool isErrored;
 } HistoryEntry;
 
 static HistoryEntry* historyHead = NULL;
@@ -65,11 +68,13 @@ int getCurrentMilis () {
     return ms;
 }
 
-void history_AddAsProvisioned(int id, char* name) {
+void history_AddAsProvisioned(int id, char* name, uint8_t* remoteKey, int keyLength) {
     sem_wait(&semaphore);
     HistoryEntry* entry = malloc(sizeof(HistoryEntry));
     entry->timestamp = getCurrentMilis();
     entry->id = id;
+    memcpy(entry->remoteKey, remoteKey, keyLength);
+    entry->isErrored = false;
     strncpy(entry->name, name, MAX_HISTORY_NAME - 1);
     entry->next = historyHead;
     historyHead = entry;

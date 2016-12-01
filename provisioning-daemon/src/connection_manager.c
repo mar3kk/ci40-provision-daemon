@@ -32,6 +32,7 @@
 #include "log.h"
 #include "utils.h"
 #include "clicker.h"
+#include "provision_history.h"
 
 #include <unistd.h>
 #include <errno.h>
