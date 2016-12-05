@@ -59,7 +59,7 @@ queue_Task * clicker_sm_GetNextTask(Clicker *clicker)
 	}
 
 
-	if (clicker->localKey != NULL && clicker->remoteKey != NULL && clicker->sharedKey == NULL)
+	if (clicker->localKey != NULL && clicker->remoteKey != NULL && clicker->sharedKey == NULL && clicker->provisioningInProgress)
 	{
 		return queue_NewQueueTask
 		(
@@ -71,7 +71,7 @@ queue_Task * clicker_sm_GetNextTask(Clicker *clicker)
 		);
 	}
 
-	if (clicker->psk == NULL)
+	if (clicker->psk == NULL && clicker->provisioningInProgress)
 	{
 		return queue_NewQueueTask
 		(

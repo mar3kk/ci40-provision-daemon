@@ -199,6 +199,7 @@ static void HandleKeyCommand(Clicker *clicker, uint8_t *data)
 	memcpy(clicker->remoteKey, &data[2], dataLength);
 	LOG(LOG_INFO, "Received exchange key from clicker : %d", clicker->clickerID);
     PRINT_BYTES(clicker->remoteKey, P_MODULE_LENGTH);
+
 }
 
 /**
@@ -258,7 +259,6 @@ static void UpdateLeds()
 	// LOG(LOG_INFO, "update leds 1");
 	if (_Mode == pd_Mode_ERROR)
 	{
-		// LOG(LOG_INFO, "update leds error");
 		if (g_activeLedOn)
 			SetAllLeds(true);
 		else
@@ -732,7 +732,6 @@ int main(int argc, char **argv)
 
 		UpdateLeds();
 
-
 		if (_SelectedClickerChanged)
 		{
 			LOG(LOG_INFO, "Selected Clicker ID : %d", _SelectedClicker->clickerID);
@@ -752,21 +751,26 @@ int main(int argc, char **argv)
 			_Mode = pd_Mode_LISTENING;
 		}
 
-        if (_SelectedClicker != NULL && _Mode == pd_Mode_PROVISIONING)
+		Clicker *clk = clicker_GetClickers();
+		while (clk != NULL)
         {
-            queue_Task *nextTask = clicker_sm_GetNextTask(_SelectedClicker);
+            queue_Task *nextTask = clicker_sm_GetNextTask(clk);
             if (nextTask != NULL)
             {
                 queue_AddTask(nextTask);
-                _SelectedClicker->taskInProgress = true;
+                clk->taskInProgress = true;
             }
+			clk = clk->next;
 
         }
 
 		queue_Task *lastResult = queue_PopResult();
+
 		if (lastResult != NULL)
 		{
+
 			Clicker *clicker = clicker_GetClickerByID(lastResult->clickerID);
+
 			if (clicker != NULL)
             {
                 switch (lastResult->type)
@@ -787,7 +791,10 @@ int main(int argc, char **argv)
                     case queue_TaskType_GENERATE_PSK:
 						if (lastResult->outData <= 0)
 						{
+							LOG(LOG_WARN, "Couldn't get PSK from Device Server");
 							clicker->error = pd_Error_GENERATE_PSK;
+							_Mode = pd_Mode_ERROR;
+							clicker->provisioningInProgress = false;
 							break;
 						}
                         LOG(LOG_INFO, "Received PSK from Device Server: %s, dataLen:%d", (char*)lastResult->outData,
@@ -809,20 +816,23 @@ int main(int argc, char **argv)
 
 		clicker_Purge();
 
+
+
 		// disconnect clickers with errors
-		Clicker *clicker = clicker_GetClickers();
-		while (clicker != NULL)
-		{
-			if (clicker->error > 0)
-			{
-				_Mode = pd_Mode_ERROR;
-				_ModeErrorTime = GetCurrentTimeMillis();
-				LOG(LOG_INFO, "Disconnecting clicker with id : %d due to error : %d", clicker->clickerID, clicker->error);
-				con_Disconnect(clicker);
-				_ModeChanged = 1;
-			}
-			clicker = clicker->next;
-		}
+		// Clicker *clicker = clicker_GetClickers();
+		// while (clicker != NULL)
+		// {
+		// 	if (clicker->error > 0)
+		// 	{
+		// 		_Mode = pd_Mode_ERROR;
+		// 		_ModeErrorTime = GetCurrentTimeMillis();
+		// 		LOG(LOG_INFO, "Disconnecting clicker with id : %d due to error : %d", clicker->clickerID, clicker->error);
+		// 		con_Disconnect(clicker);
+		// 		_ModeChanged = 1;
+		// 	}
+		// 	clicker = clicker->next;
+		// }
+
 
 		if (_Mode == pd_Mode_ERROR && loopStartTime - _ModeErrorTime > 5000)
 		{
