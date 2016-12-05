@@ -44,7 +44,7 @@ typedef struct {
 
 void history_init();
 void history_destroy();
-void history_AddAsProvisioned(int id, char* name, uint8_t* remoteKey, int keyLength);
+void history_AddAsProvisioned(int id, char* name);
 void history_GetProvisioned(HistoryItem** listOfId, int* sizeOfList);
 void history_RemoveProvisioned(int id);
 

@@ -259,7 +259,6 @@ static void UpdateLeds()
 	// LOG(LOG_INFO, "update leds 1");
 	if (_Mode == pd_Mode_ERROR)
 	{
-		LOG(LOG_INFO, "update leds error");
 		if (g_activeLedOn)
 			SetAllLeds(true);
 		else
@@ -805,7 +804,7 @@ int main(int argc, char **argv)
                         HexStringToByteArray(lastResult->outData, clicker->psk, lastResult->outDataLength/2);
                         TryToSendPsk(clicker);
                         FREE_AND_NULL(lastResult->outData);
-                        history_AddAsProvisioned(clicker->clickerID, clicker->name, clicker->remoteKey, P_MODULE_LENGTH);
+                        history_AddAsProvisioned(clicker->clickerID, clicker->name);
                         break;
                     default:
                         break;
