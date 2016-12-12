@@ -28,32 +28,29 @@
  * WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <letmecreate/letmecreate.h>
 #include "led.h"
-
-#include <letmecreate/core.h>
-#include <math.h>
 
 void SetLeds(int numberOfClickers, int selectedClickerIndex, int activeClickerLedOn)
 {
+    uint8_t mask = 0;
+    int i = 0;
 
     if (numberOfClickers == 0)
     {
         led_release();
         return;
     }
+
     led_init();
-    int mask = 0;
-    int i = 0;
 
-    for (i = 0; i < numberOfClickers; i++) {
-        mask +=  pow(2,i);
-    }
+    for (i = 0; i < numberOfClickers; i++)
+        mask |= 1 << i;
+
     if (activeClickerLedOn)
-    {
-        mask^=(int)pow(2, selectedClickerIndex);
-    }
-    led_set(ALL_LEDS, mask);
+        mask ^= 1 << selectedClickerIndex;
 
+    led_set(ALL_LEDS, mask);
 }
 
 void SetAllLeds(bool on)
