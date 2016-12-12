@@ -74,12 +74,12 @@ void HexStringToByteArray(const char* hexstr, uint8_t * dst, size_t len)
 }
 
 bool GenerateRandomX(unsigned char* array, int length) {
-  unsigned long seed = GetCurrentTimeMillis();
-  srand(seed);
+    unsigned long seed = GetCurrentTimeMillis();
+    srand(seed);
 
-  for (int i = 0; i < length; ++i) {
-    array[i] = (rand()%9);
-  }
+    for (int i = 0; i < length; ++i) {
+        array[i] = (rand()%9);
+    }
 
   return true;
 }
@@ -92,49 +92,46 @@ void GenerateClickerTimeHash(char *buffer)
 
 void GenerateClickerName(char* outBuffer, int maxBufLen, char *pattern, char *hash, char *ip)
 {
-  bool inBracket = false;
-  maxBufLen--;
-  while( (maxBufLen > 0) && (*pattern != 0) ) {
+    bool inBracket = false;
+    maxBufLen--;
+    while( (maxBufLen > 0) && (*pattern != 0) ) {
+        if (inBracket == false) {
+            if (*pattern != '{') {
+                *outBuffer = *pattern;
+                outBuffer++;
+                maxBufLen--;
+            } else {
+                inBracket = true;
+            }
+            pattern++;
 
-    if (inBracket == false) {
-      if (*pattern != '{') {
-        *outBuffer = *pattern;
-        outBuffer++;
-        maxBufLen--;
+        } else {
+            char* token = NULL;
+            char id = *pattern;
+            pattern++;
+            if ((id == 0) || (*pattern != '}')) {
+                break;
+            }
 
-      } else {
-        inBracket = true;
-      }
-      pattern++;
+            char ids[] = {'t', 'i'};
+            char* tokens[] = {hash, ip };
+            for(int t = 0; t < sizeof(ids); t++) {
+                if (ids[t] == id) {
+                    token = tokens[t];
+                    break;
+                }
+            }
 
-    } else {
-      char* token = NULL;
-      char id = *pattern;
-      pattern++;
-      if ((id == 0) || (*pattern != '}')) {
-        break;
-      }
-
-      char ids[] = {'t', 'i'};
-      char* tokens[] = {hash, ip };
-      for(int t = 0; t < sizeof(ids); t++) {
-        if (ids[t] == id) {
-          token = tokens[t];
-          break;
+            if (token != NULL) {
+                pattern++;
+                int len = (int)strlen(token);
+                len = len > maxBufLen ? maxBufLen : len;
+                strcpy(outBuffer, token);
+                maxBufLen -= len;
+                outBuffer += len;
+                inBracket = false;
+            }
         }
-      }
-
-      if (token != NULL) {
-        pattern++;
-        int len = (int)strlen(token);
-        len = len > maxBufLen ? maxBufLen : len;
-        strcpy(outBuffer, token);
-        maxBufLen -= len;
-        outBuffer += len;
-        inBracket = false;
-      }
-
     }
-  }
-  *outBuffer = 0;
+    *outBuffer = 0;
 }
