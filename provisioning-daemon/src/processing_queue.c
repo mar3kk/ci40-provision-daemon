@@ -142,8 +142,6 @@ static void queue_HandleGeneratePsk(queue_Task *task)
     _Psk = NULL;
     sem_post(&semaphore);
 
-//toster    pdubus_Init();
-
     pdubus_GeneratePskRequest *request;
     request = malloc(sizeof(pdubus_GeneratePskRequest));
     request->callback = GeneratePskCallback;
@@ -158,7 +156,6 @@ static void queue_HandleGeneratePsk(queue_Task *task)
         FREE_AND_NULL(request);
     }
 
-//toster    pdubus_Close();
 }
 
 static void queue_HandleGenerateSharedKey(queue_Task *task)
@@ -213,9 +210,7 @@ static void * queue_Loop(void *arg)
         keepRunning = _KeepRunning;
         sem_post(&semaphore);
     }
-//    LOG(LOG_INFO,"A");
-//    sem_close(&semaphore);
-//    LOG(LOG_INFO,"B");
+
     return NULL;
 }
 

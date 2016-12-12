@@ -224,7 +224,6 @@ Clicker *clicker_GetClickerByID(int id)
 int clicker_GetIndexOfClicker(Clicker* clicker)
 {
     int t = sem_trywait(&semaphore);
-    //printf("semaphor value %d\n", t);
     if (t == 0)
         sem_post(&semaphore);
     sem_wait(&semaphore);

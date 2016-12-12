@@ -246,7 +246,6 @@ static void ClickerConnectionHandler(Clicker *clicker, char *ip)
  */
 static void UpdateLeds(void)
 {
-    //LOG(LOG_INFO, "update leds");
     int interval = (_Mode == pd_Mode_LISTENING || _Mode == pd_Mode_ERROR) ? LED_BLINK_INTERVAL_MS : P_LED_BLINK_INTERVAL_MS;
     unsigned long currentTime = GetCurrentTimeMillis();
     if (currentTime - _LastBlinkTime > interval)
@@ -257,7 +256,7 @@ static void UpdateLeds(void)
         else
             g_activeLedOn = 1;
     }
-    // LOG(LOG_INFO, "update leds 1");
+
     if (_Mode == pd_Mode_ERROR)
     {
         if (g_activeLedOn)
@@ -267,7 +266,6 @@ static void UpdateLeds(void)
     }
     else
     {
-        // LOG(LOG_INFO, "update leds noerror");
         SetLeds(g_pd_ConnectedClickers, clicker_GetIndexOfClicker(_SelectedClicker), g_activeLedOn);
     }
 }

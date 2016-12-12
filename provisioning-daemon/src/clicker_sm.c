@@ -79,6 +79,5 @@ queue_Task * clicker_sm_GetNextTask(Clicker *clicker)
         );
     }
 
-    //LOG(LOG_INFO, "GetNExtTaskEnd");
     return NULL;
 }
