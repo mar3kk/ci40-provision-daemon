@@ -88,9 +88,10 @@ void PurgeOld(void)
 {
     long current = getCurrentMilis();
     HistoryEntry* prev = NULL;
-    for (HistoryEntry* tmp = historyHead; tmp != NULL; tmp = tmp->next) {
-        if ( (current - tmp->timestamp) > MAX_LIVE_TIME) {
-
+    for (HistoryEntry* tmp = historyHead; tmp != NULL; tmp = tmp->next)
+    {
+        if ( (current - tmp->timestamp) > MAX_LIVE_TIME)
+        {
             if (prev == NULL)
                 historyHead = tmp->next;
             else
@@ -112,10 +113,12 @@ void history_GetProvisioned(HistoryItem** listOfId, int* sizeOfList)
         count++;
 
     *sizeOfList = count;
-    if (count > 0) {
+    if (count > 0)
+    {
         HistoryItem* result = malloc(sizeof(HistoryItem) * count);
         *listOfId = result;
-        for(HistoryEntry* tmp = historyHead; tmp != NULL; tmp = tmp->next) {
+        for(HistoryEntry* tmp = historyHead; tmp != NULL; tmp = tmp->next)
+        {
             result->id = tmp->id;
             strcpy( result->name, tmp->name );
             result++;
@@ -128,8 +131,10 @@ void history_RemoveProvisioned(int id)
 {
     sem_wait(&semaphore);
     HistoryEntry* prev = NULL;
-    for(HistoryEntry* tmp = historyHead; tmp != NULL; tmp = tmp->next) {
-        if (tmp->id == id) {
+    for(HistoryEntry* tmp = historyHead; tmp != NULL; tmp = tmp->next)
+    {
+        if (tmp->id == id)
+        {
             if (prev == NULL)
                 historyHead = tmp->next;
             else

@@ -404,7 +404,8 @@ int pd_SetSelectedClicker(int id)
 
     int result = (_SelectedClicker != NULL) ? _SelectedClicker->clickerID : -1;
     Clicker* tmp = clicker_GetClickerByID(id);
-    if (tmp != NULL) {
+    if (tmp != NULL)
+    {
         _SelectedClicker = tmp;
         result = tmp->clickerID;
         _SelectedClickerChanged = 1;
@@ -612,7 +613,8 @@ static int ParseCommandArgs(int argc, char *argv[], const char **fptr)
         }
     }
 
-    if (configFilePath == NULL) {
+    if (configFilePath == NULL)
+    {
         configFilePath = malloc(strlen(DEFAULT_PATH_CONFIG_FILE));
         sprintf(configFilePath, "%s", DEFAULT_PATH_CONFIG_FILE);
     }
@@ -670,7 +672,8 @@ int main(int argc, char **argv)
     sem_init(&semaphore, 0, 1);
     history_init();
 
-    if (_PDConfig.localProvisionControl) {
+    if (_PDConfig.localProvisionControl)
+    {
         LOG(LOG_INFO, "Enabling button controls.");
         int result = switch_init();
         result += switch_add_callback(0x02, Switch1PressedCallback);
@@ -681,12 +684,14 @@ int main(int argc, char **argv)
 
     clicker_InitSemaphore();
 
-    if (ubusagent_Init() == false) {
+    if (ubusagent_Init() == false)
+    {
         LOG(LOG_ERR, "Unable to register to uBus!");
         CleanupOnExit();
         return -1;
     }
-    if (_PDConfig.remoteProvisionControl) {
+    if (_PDConfig.remoteProvisionControl)
+    {
         LOG(LOG_INFO, "Enabling provision control through uBus.");
         if (ubusagent_EnableRemoteControl() == false)
             LOG(LOG_ERR, "Problems with uBus, remote control is disabled!");
@@ -703,7 +708,8 @@ int main(int argc, char **argv)
         UpdateSelectedClicker();
 
         // Handle buttons press
-        if (_PDConfig.localProvisionControl) {
+        if (_PDConfig.localProvisionControl)
+        {
             if (_Switch1Pressed)
                 HandleButton1Press();
 

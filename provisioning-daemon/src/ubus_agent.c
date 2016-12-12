@@ -155,7 +155,8 @@ static int GetStateMethodHandler(struct ubus_context *ctx, struct ubus_object *o
 
     blob_buf_init(&replyBloob, 0);
     void* cookie_array = blobmsg_open_array(&replyBloob, "clickers");
-    for(int t = 0; t < historyCount; t++) {
+    for(int t = 0; t < historyCount; t++)
+    {
         void* cookie_item = blobmsg_open_table(&replyBloob, "clicker");
 
         blobmsg_add_u32(&replyBloob, "id", history[t].id);
@@ -169,20 +170,24 @@ static int GetStateMethodHandler(struct ubus_context *ctx, struct ubus_object *o
 
     bool alreadyProvisioned = false;
 
-    for(int t = 0; t < clickersCount; t++) {
+    for(int t = 0; t < clickersCount; t++)
+    {
         Clicker* clk = clicker_AcquireOwnershipAtIndex(t);
         if (clk == NULL)
             continue;
 
         alreadyProvisioned = false;
-        for(int j = 0; j < historyCount; j++) {
-            if (history[j].id == clk->clickerID) {
+        for(int j = 0; j < historyCount; j++)
+        {
+            if (history[j].id == clk->clickerID)
+            {
                 alreadyProvisioned = true;
                 break;
             }
         }
 
-        if (alreadyProvisioned) {
+        if (alreadyProvisioned)
+        {
             clicker_ReleaseOwnership(clk);
             continue;
         }
@@ -249,14 +254,17 @@ void HelperTimeoutHandler(struct uloop_timeout *t)
 static void* PDUbusLoop(void *arg)
 {
     LOG(LOG_INFO, "uBusAgent: uBus thread started.\n");
-    while(true) {
+    while(true)
+    {
         sem_wait(&semaphore);
-        if (uBusRunning == false) {
+        if (uBusRunning == false)
+        {
             sem_post(&semaphore);
             break;
         }
 
-        while(uBusInterruption) {
+        while(uBusInterruption)
+        {
             uBusInInterState = true;
             LOG(LOG_INFO, "Interrupt state");
             sem_post(&semaphore);
@@ -288,7 +296,8 @@ static void SetUBusLoopInterruption(bool state)
 
 static void WaitForInterruptState(void)
 {
-    while(true) {
+    while(true)
+    {
         sem_wait(&semaphore);
         bool ok = uBusInInterState;
         sem_post(&semaphore);

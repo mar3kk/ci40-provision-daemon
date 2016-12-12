@@ -63,7 +63,8 @@ static void GeneratePskCallback(char *psk, uint8_t pskLen, void *arg)
 {
     pdubus_GeneratePskRequest *request = (pdubus_GeneratePskRequest*)arg;
     queue_Task *task = request->priv;
-    if (psk == NULL) {
+    if (psk == NULL)
+    {
         task->outData = NULL;
         task->outDataLength = 0;
         sem_wait(&semaphore);
@@ -184,8 +185,8 @@ static void queue_HandleTask(queue_Task *task)
         case queue_TaskType_GENERATE_SHARED_KEY:
             queue_HandleGenerateSharedKey(task);
             break;
-    default:
-        break;
+        default:
+            break;
     }
 }
 

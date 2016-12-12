@@ -100,18 +100,25 @@ void GenerateClickerName(char* outBuffer, int maxBufLen, char *pattern, char *ha
 {
     bool inBracket = false;
     maxBufLen--;
-    while( (maxBufLen > 0) && (*pattern != 0) ) {
-        if (inBracket == false) {
-            if (*pattern != '{') {
+    while( (maxBufLen > 0) && (*pattern != 0) )
+    {
+        if (inBracket == false)
+        {
+            if (*pattern != '{')
+            {
                 *outBuffer = *pattern;
                 outBuffer++;
                 maxBufLen--;
-            } else {
+            }
+            else
+            {
                 inBracket = true;
             }
             pattern++;
 
-        } else {
+        }
+        else
+        {
             char* token = NULL;
             char id = *pattern;
             pattern++;
@@ -120,14 +127,17 @@ void GenerateClickerName(char* outBuffer, int maxBufLen, char *pattern, char *ha
 
             char ids[] = {'t', 'i'};
             char* tokens[] = {hash, ip };
-            for(int t = 0; t < sizeof(ids); t++) {
-                if (ids[t] == id) {
+            for(int t = 0; t < sizeof(ids); t++)
+            {
+                if (ids[t] == id)
+                {
                     token = tokens[t];
                     break;
                 }
             }
 
-            if (token != NULL) {
+            if (token != NULL)
+            {
                 pattern++;
                 int len = (int)strlen(token);
                 len = len > maxBufLen ? maxBufLen : len;
