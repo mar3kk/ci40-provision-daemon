@@ -77,9 +77,8 @@ bool GenerateRandomX(unsigned char* array, int length) {
     unsigned long seed = GetCurrentTimeMillis();
     srand(seed);
 
-    for (int i = 0; i < length; ++i) {
-        array[i] = (rand()%9);
-    }
+    for (int i = 0; i < length; ++i)
+        array[i] = rand() % 9;
 
   return true;
 }
@@ -109,9 +108,8 @@ void GenerateClickerName(char* outBuffer, int maxBufLen, char *pattern, char *ha
             char* token = NULL;
             char id = *pattern;
             pattern++;
-            if ((id == 0) || (*pattern != '}')) {
+            if ((id == 0) || (*pattern != '}'))
                 break;
-            }
 
             char ids[] = {'t', 'i'};
             char* tokens[] = {hash, ip };

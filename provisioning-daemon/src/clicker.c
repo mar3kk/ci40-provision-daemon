@@ -111,12 +111,11 @@ static void InnerRemove(Clicker **head, Clicker *clicker, bool doLock)
         }
     }
 
-    if (current == *head) {
+    if (current == *head)
         *head = current->next;
-    }
-    else {
+    else
         previous->next = current->next;
-    }
+
     if (doLock)
         sem_post(&semaphore);
 }
@@ -188,9 +187,8 @@ Clicker *clicker_InnerGetClickerAtIndex(int index)
     {
         i++;
         if (i == index)
-        {
             return ptr;
-        }
+
         ptr = ptr->next;
     }
     return NULL;
@@ -267,9 +265,8 @@ Clicker* clicker_AcquireOwnershipAtIndex(int index)
     sem_wait(&semaphore);
 
     Clicker* clicker = clicker_InnerGetClickerAtIndex(index);
-    if (clicker != NULL) {
+    if (clicker != NULL)
         clicker->ownershipsCount++;
-    }
 
     sem_post(&semaphore);
 

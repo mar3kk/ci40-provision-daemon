@@ -41,9 +41,7 @@ queue_Task * clicker_sm_GetNextTask(Clicker *clicker)
         return NULL;
     }
     if (clicker->taskInProgress)
-    {
         return NULL;
-    }
 
     if (clicker->localKey == NULL)
     {

@@ -298,9 +298,7 @@ static void UpdateSelectedClicker(void)
         if (_SelectedClicker->next != NULL)
             _SelectedClicker = _SelectedClicker->next;
         else
-        {
             _SelectedClicker = clicker_GetClickerAtIndex(0);
-        }
     }
 }
 
@@ -393,9 +391,9 @@ static void HandleModeChanged(void)
 int pd_GetSelectedClickerId(void) {
     int result = -1;
     sem_wait(&semaphore);
-    if (_SelectedClicker != NULL) {
+    if (_SelectedClicker != NULL)
         result = _SelectedClicker->clickerID;
-    }
+
     sem_post(&semaphore);
     return result;
 }
@@ -573,9 +571,8 @@ static int ParseCommandArgs(int argc, char *argv[], const char **fptr)
     {
         opt = getopt(argc, argv, "v:c:l:dr");
         if (opt == -1)
-        {
             break;
-        }
+
         switch (opt)
         {
             case 'v':
@@ -619,14 +616,10 @@ static int ParseCommandArgs(int argc, char *argv[], const char **fptr)
     }
 
     if (ReadConfigFile(configFilePath) == false)
-    {
         return -1;
-    }
 
     if (configFilePath != NULL)
-    {
         free(configFilePath);
-    }
 
     return 1;
 }
@@ -635,9 +628,9 @@ void CleanupOnExit(void) {
     ubusagent_Close();
     bi_releaseConst();
     queue_Stop();
-    if (_PDConfig.localProvisionControl) {
+    if (_PDConfig.localProvisionControl)
         switch_release();
-    }
+
     config_destroy(&_Cfg);
     sem_destroy(&semaphore);
     sem_destroy(&debugSemapthore);
@@ -661,13 +654,9 @@ int main(int argc, char **argv)
         logFile = fopen(fptr, "w");
 
         if (logFile != NULL)
-        {
             g_debugStream  = logFile;
-        }
         else
-        {
             LOG(LOG_ERR, "Failed to create or open %s file", fptr);
-        }
     }
 
     g_debugLevel = _PDConfig.logLevel;
@@ -683,9 +672,8 @@ int main(int argc, char **argv)
         int result = switch_init();
         result += switch_add_callback(0x02, Switch1PressedCallback);
         result += switch_add_callback(0x04, Switch2PressedCallback);
-        if (result != 0) {
+        if (result != 0)
             LOG(LOG_ERR, "Problems while acquiring buttons, local provision control might not work.");
-        }
     }
 
     clicker_InitSemaphore();
@@ -697,9 +685,8 @@ int main(int argc, char **argv)
     }
     if (_PDConfig.remoteProvisionControl) {
         LOG(LOG_INFO, "Enabling provision control through uBus.");
-        if (ubusagent_EnableRemoteControl() == false) {
+        if (ubusagent_EnableRemoteControl() == false)
             LOG(LOG_ERR, "Problems with uBus, remote control is disabled!");
-        }
     }
     con_BindAndListen(_PDConfig.tcpPort, CommandHandler, ClickerConnectionHandler, ClickerDisconnectionHandler);
     queue_Start();
@@ -715,20 +702,15 @@ int main(int argc, char **argv)
         // Handle buttons press
         if (_PDConfig.localProvisionControl) {
             if (_Switch1Pressed)
-            {
                 HandleButton1Press();
-            }
+
             if (_Switch2Pressed)
-            {
                 HandleButton2Press();
-            }
         }
 
 
         if (_ModeChanged)
-        {
             HandleModeChanged();
-        }
 
         UpdateLeds();
 
@@ -742,9 +724,8 @@ int main(int argc, char **argv)
             while (clicker != NULL)
             {
                 if (clicker != _SelectedClicker)
-                {
                     con_SendCommand(clicker, NetworkCommand_DISABLE_HIGHLIGHT);
-                }
+
                 clicker = clicker->next;
             }
             _SelectedClickerChanged = 0;
@@ -841,9 +822,7 @@ int main(int argc, char **argv)
         if (_SelectedClicker != NULL && _SelectedClicker->provisionTime > 0)
         {
             if (loopStartTime - _SelectedClicker->provisionTime > 3000)
-            {
                 con_Disconnect(_SelectedClicker);
-            }
         }
 
         long long int loopEndTime = GetCurrentTimeMillis();

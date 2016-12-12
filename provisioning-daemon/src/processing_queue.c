@@ -98,9 +98,8 @@ void queue_AddTask(queue_Task *task)
     queue_Task *current = _Tasks;
 
     while (current->next != NULL)
-    {
          current = current->next;
-    }
+
     current->next = task;
     task->next = NULL;
 
@@ -207,9 +206,8 @@ static void * queue_Loop(void *arg)
         queue_Task* r = _Result;
         sem_post(&semaphore);
         if (t != NULL && r == NULL)
-        {
              queue_HandleTask(queue_PopTask());
-        }
+
         usleep(1000 * 200);
         sem_wait(&semaphore);
         keepRunning = _KeepRunning;
@@ -239,9 +237,7 @@ void queue_Start(void)
 {
     sem_init(&semaphore, 0, 1);
     if (pthread_create(&_QueueThread, NULL, queue_Loop, NULL) < 0)
-    {
         LOG(LOG_DBG, "Error starting queue thread");
-    }
 }
 
 void queue_Stop(void)

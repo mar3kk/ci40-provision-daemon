@@ -178,9 +178,8 @@ static void CheckConnections(void)
     while(clicker != NULL)
     {
         if (currentTimeMillis - clicker->lastKeepAliveTime > KEEP_ALIVE_TIMEOUT_MS)
-        {
             HandleDisconnect(clicker);
-        }
+
         clicker = clicker->next;
     }
 }
@@ -213,16 +212,10 @@ void con_ProcessConnections(void)
         return;
     }
 
-    if (FD_ISSET(_MasterSocket, &_Readfs))
-    {
-        //handle incoming connection
+    if (FD_ISSET(_MasterSocket, &_Readfs))  //handle incoming connection
         AcceptConnection(&_Address);
-    }
-    else
-    {
-        //handle read
+    else                                    //handle read
         HandleRead(&_Address);
-    }
 
     unsigned long currentTimeMillis = GetCurrentTimeMillis();
     if (currentTimeMillis - _LastKeepAliveSendTime > KEEP_ALIVE_INTERVAL_MS)

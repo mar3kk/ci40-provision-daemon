@@ -114,9 +114,9 @@ static int SelectMethodHandler(struct ubus_context *ctx, struct ubus_object *obj
     blobmsg_parse(_SelectPolicy, ARRAY_SIZE(_SelectPolicy), argBuffer, blob_data(msg), blob_len(msg));
 
     uint32_t clickerId = 0xffffffff;
-    if (argBuffer[SELECT_CLICKER_ID]) {
+    if (argBuffer[SELECT_CLICKER_ID])
         clickerId = blobmsg_get_u32(argBuffer[SELECT_CLICKER_ID]);
-    }
+
     LOG(LOG_DBG, "uBusAgent: Select, move to clickerId:%d", clickerId);
 
     int returnedId = pd_SetSelectedClicker(clickerId);
@@ -169,9 +169,9 @@ static int GetStateMethodHandler(struct ubus_context *ctx, struct ubus_object *o
 
     for(int t = 0; t < clickersCount; t++) {
         Clicker* clk = clicker_AcquireOwnershipAtIndex(t);
-        if (clk == NULL) {
+        if (clk == NULL)
             continue;
-        }
+
         alreadyProvisioned = false;
         for(int j = 0; j < historyCount; j++) {
             if (history[j].id == clk->clickerID) {
@@ -236,9 +236,9 @@ static void GeneratePskResponseHandler(struct ubus_request *req, int type, struc
 
 void HelperTimeoutHandler(struct uloop_timeout *t) {
     sem_wait(&semaphore);
-    if (uBusInterruption) {
+    if (uBusInterruption)
         uloop_cancelled = true;
-    }
+
     sem_post(&semaphore);
     uloop_timeout_set(&uBusHelperProcess, 500);
 }
@@ -286,9 +286,9 @@ static void WaitForInterruptState(void) {
         sem_wait(&semaphore);
         bool ok = uBusInInterState;
         sem_post(&semaphore);
-        if (ok) {
+        if (ok)
             break;
-        }
+
         usleep(200 * 1000);
     }
 }
@@ -326,9 +326,9 @@ bool ubusagent_EnableRemoteControl(void) {
     WaitForInterruptState();
     LOG(LOG_INFO, "uBusAgent: Enabling provision control through uBus");
     int ret = ubus_add_object(_UbusCTX, &_UBusAgentObject);
-    if (ret) {
+    if (ret)
         LOG(LOG_ERR, "uBusAgent: Failed to add object: %s\n", ubus_strerror(ret));
-    }
+
     SetUBusLoopInterruption(false);
 
     return ret == 0;
@@ -338,9 +338,9 @@ void ubusagent_Close(void)
 {
     SetUBusLoopInterruption(false);
     SetUBusRunning(false);
-    if (_UbusCTX) {
+    if (_UbusCTX)
         ubus_free(_UbusCTX);
-    }
+
     uloop_done();
     sem_destroy(&semaphore);
 }

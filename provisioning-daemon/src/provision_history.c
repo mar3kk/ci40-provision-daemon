@@ -86,11 +86,11 @@ void PurgeOld(void){
     for (HistoryEntry* tmp = historyHead; tmp != NULL; tmp = tmp->next) {
         if ( (current - tmp->timestamp) > MAX_LIVE_TIME) {
 
-            if (prev == NULL) {
+            if (prev == NULL)
                 historyHead = tmp->next;
-            } else {
+            else
                 prev->next = tmp->next;
-            }
+
             free(tmp);
             break;
         }
@@ -102,9 +102,9 @@ void history_GetProvisioned(HistoryItem** listOfId, int* sizeOfList) {
     sem_wait(&semaphore);
     PurgeOld();
     int count = 0;
-    for(HistoryEntry* tmp = historyHead; tmp != NULL; tmp = tmp->next) {
+    for(HistoryEntry* tmp = historyHead; tmp != NULL; tmp = tmp->next)
         count++;
-    }
+
     *sizeOfList = count;
     if (count > 0) {
         HistoryItem* result = malloc(sizeof(HistoryItem) * count);
@@ -123,11 +123,11 @@ void history_RemoveProvisioned(int id) {
     HistoryEntry* prev = NULL;
     for(HistoryEntry* tmp = historyHead; tmp != NULL; tmp = tmp->next) {
         if (tmp->id == id) {
-            if (prev == NULL) {
+            if (prev == NULL)
                 historyHead = tmp->next;
-            } else {
+            else
                 prev->next = tmp->next;
-            }
+
             free(tmp);
             break;
         }
