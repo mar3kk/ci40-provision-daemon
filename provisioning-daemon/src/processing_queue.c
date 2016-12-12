@@ -59,9 +59,9 @@ static uint8_t _PskLen = 0;
 
 
 
-static void GeneratePskCallback(char *psk, uint8_t pskLen, pdubus_GeneratePskRequest *request)
+static void GeneratePskCallback(char *psk, uint8_t pskLen, void *arg)
 {
-
+    pdubus_GeneratePskRequest *request = (pdubus_GeneratePskRequest*)arg;
     queue_Task *task = request->priv;
     if (psk == NULL) {
         task->outData = NULL;
