@@ -55,8 +55,5 @@ void SetLeds(int numberOfClickers, int selectedClickerIndex, int activeClickerLe
 
 void SetAllLeds(bool on)
 {
-    if (on)
-        led_set(ALL_LEDS, ALL_LEDS);
-    else
-        led_set(ALL_LEDS, 0);
+    led_set(ALL_LEDS, on ? ALL_LEDS : 0);
 }
