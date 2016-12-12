@@ -35,7 +35,6 @@
 
 queue_Task * clicker_sm_GetNextTask(Clicker *clicker)
 {
-
     if (clicker == NULL)
     {
         LOG(LOG_WARN, "clicker_sm_GetNextTask: Passed clicker is NULL");
@@ -57,7 +56,6 @@ queue_Task * clicker_sm_GetNextTask(Clicker *clicker)
             clicker->semaphore
         );
     }
-
 
     if (clicker->localKey != NULL && clicker->remoteKey != NULL && clicker->sharedKey == NULL && clicker->provisioningInProgress)
     {

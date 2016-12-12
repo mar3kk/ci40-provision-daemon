@@ -190,7 +190,6 @@ static void queue_HandleTask(queue_Task *task)
             break;
     default:
         break;
-
     }
 }
 
@@ -238,7 +237,6 @@ queue_Task *queue_NewQueueTask(queue_TaskType type, uint8_t clickerID, void * in
 
 void queue_Start(void)
 {
-
     sem_init(&semaphore, 0, 1);
     if (pthread_create(&_QueueThread, NULL, queue_Loop, NULL) < 0)
     {

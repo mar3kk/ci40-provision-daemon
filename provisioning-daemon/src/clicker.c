@@ -68,13 +68,9 @@ static void InnerAdd(Clicker **head, Clicker *clicker)
     sem_wait(&semaphore);
     if (*head == NULL)
     {
-
         *head = clicker;
-
         (*head)->next = NULL;
-
         sem_post(&semaphore);
-
         return;
     }
     Clicker * current = *head;
@@ -104,7 +100,6 @@ static void InnerRemove(Clicker **head, Clicker *clicker, bool doLock)
 
     while (current != clicker)
     {
-
         if (current->next == NULL){
             if (doLock)
                 sem_post(&semaphore);
@@ -255,7 +250,6 @@ Clicker *clicker_GetClickers(void)
 {
     return clickers;
 }
-
 
 Clicker *clicker_AcquireOwnership(int clickerID)
 {

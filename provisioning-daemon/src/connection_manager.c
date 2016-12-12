@@ -101,7 +101,6 @@ static void AcceptConnection(struct sockaddr_in6 *address)
 
 static int HandleRead(struct sockaddr_in6 *address)
 {
-
     int sd = 0;
     size_t valread = 0;
     Clicker *clicker = clicker_GetClickers();
@@ -126,8 +125,6 @@ static int HandleRead(struct sockaddr_in6 *address)
     }
     return 0;
 }
-
-
 
 int con_BindAndListen(
     int tcpPort,
@@ -230,7 +227,6 @@ void con_ProcessConnections(void)
     unsigned long currentTimeMillis = GetCurrentTimeMillis();
     if (currentTimeMillis - _LastKeepAliveSendTime > KEEP_ALIVE_INTERVAL_MS)
     {
-
         _LastKeepAliveSendTime = currentTimeMillis;
         Clicker *ptr = clicker_GetClickers();
 
@@ -243,7 +239,6 @@ void con_ProcessConnections(void)
 
     if (currentTimeMillis - _LastCheckConnectionsTime > CHECK_CONNECTIONS_INTERVAL_MS)
     {
-
         _LastCheckConnectionsTime = currentTimeMillis;
         CheckConnections();
     }

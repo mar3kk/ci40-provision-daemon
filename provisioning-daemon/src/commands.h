@@ -60,7 +60,4 @@ typedef struct __attribute__((__packed__))
     char endpointName[COMMAND_ENDPOINT_NAME_LENGTH];
 } pd_NetworkConfig;
 
-
-
-
 #endif

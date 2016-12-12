@@ -449,7 +449,6 @@ void TryToSendPsk(Clicker *clicker)
 }
 
 static bool ReadConfigFile(const char *filePath) {
-
     config_init(&_Cfg);
     if(! config_read_file(&_Cfg, filePath))
     {
@@ -769,7 +768,6 @@ int main(int argc, char **argv)
 
         if (lastResult != NULL)
         {
-
             Clicker *clicker = clicker_GetClickerByID(lastResult->clickerID);
 
             if (clicker != NULL)
@@ -817,8 +815,6 @@ int main(int argc, char **argv)
 
         clicker_Purge();
 
-
-
         // disconnect clickers with errors
         // Clicker *clicker = clicker_GetClickers();
         // while (clicker != NULL)
@@ -853,7 +849,6 @@ int main(int argc, char **argv)
         long long int loopEndTime = GetCurrentTimeMillis();
         if (loopEndTime - loopStartTime < 50)
             usleep(1000*(50-(loopEndTime-loopStartTime)));
-
     }
 
     CleanupOnExit();
