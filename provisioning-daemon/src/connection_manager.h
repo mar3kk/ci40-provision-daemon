@@ -40,7 +40,7 @@
 #define MAX_CLIENTS                             (30)
 #define KEEP_ALIVE_INTERVAL_MS                  (2000)
 #define KEEP_ALIVE_TIMEOUT_MS                   (30000)
-#define CHECK_CONNECTIONS_INTERVAL_MS			(2000)
+#define CHECK_CONNECTIONS_INTERVAL_MS           (2000)
 
 /**
  * @brief Keeps the number of currently connected clickers
@@ -58,10 +58,10 @@ typedef void (*pd_ClickerDisconnectedCallback)(Clicker *clicker);
  * @param[in] clickerDisconnectedCallback function called upon clicker disconnection
  */
 int con_BindAndListen(
-	int tcpPort,
-	pd_CommandCallback commandCallback,
-	pd_ClickerConnectedCallback clickerConnectedCallback,
-	pd_ClickerDisconnectedCallback clickerDisconnectedCallback);
+    int tcpPort,
+    pd_CommandCallback commandCallback,
+    pd_ClickerConnectedCallback clickerConnectedCallback,
+    pd_ClickerDisconnectedCallback clickerDisconnectedCallback);
 
 /**
  *  @brief Accepts incoming connections and handles read from socket. Should be called periodically.

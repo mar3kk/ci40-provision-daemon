@@ -323,8 +323,8 @@ bool ubusagent_Init()
 
 bool ubusagent_EnableRemoteControl() {
     SetUBusLoopInterruption(true);
-	WaitForInterruptState();
-	LOG(LOG_INFO, "uBusAgent: Enabling provision control through uBus");
+    WaitForInterruptState();
+    LOG(LOG_INFO, "uBusAgent: Enabling provision control through uBus");
     int ret = ubus_add_object(_UbusCTX, &_UBusAgentObject);
     if (ret) {
         LOG(LOG_ERR, "uBusAgent: Failed to add object: %s\n", ubus_strerror(ret));

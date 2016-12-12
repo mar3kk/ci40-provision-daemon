@@ -56,10 +56,10 @@ typedef struct queue_Task
 {
     queue_TaskType type;
     uint8_t clickerID;
-	void * inData;
-	uint8_t inDataLength;
-	void *outData;
-	uint8_t outDataLength;
+    void * inData;
+    uint8_t inDataLength;
+    void *outData;
+    uint8_t outDataLength;
     sem_t * semaphore;
     int statusCode;
     struct queue_Task *next;

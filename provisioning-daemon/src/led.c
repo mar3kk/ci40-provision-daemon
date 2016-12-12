@@ -36,12 +36,12 @@
 void SetLeds(int numberOfClickers, int selectedClickerIndex, int activeClickerLedOn)
 {
 
-	if (numberOfClickers == 0)
-	{
-		led_release();
-		return;
-	}
-	led_init();
+    if (numberOfClickers == 0)
+    {
+        led_release();
+        return;
+    }
+    led_init();
     int mask = 0;
     int i = 0;
 
@@ -58,8 +58,8 @@ void SetLeds(int numberOfClickers, int selectedClickerIndex, int activeClickerLe
 
 void SetAllLeds(bool on)
 {
-	if (on)
-		led_set(ALL_LEDS, ALL_LEDS);
-	else
-		led_set(ALL_LEDS, 0);
+    if (on)
+        led_set(ALL_LEDS, ALL_LEDS);
+    else
+        led_set(ALL_LEDS, 0);
 }

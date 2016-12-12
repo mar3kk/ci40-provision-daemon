@@ -54,13 +54,13 @@ static int _IDCounter = 0;
 
 static void Destroy(Clicker *clicker)
 {
-	dh_release(&clicker->keysExchanger);
-	FREE_AND_NULL(clicker->localKey);
-	FREE_AND_NULL(clicker->remoteKey);
-	FREE_AND_NULL(clicker->sharedKey);
-	FREE_AND_NULL(clicker->psk);
-	FREE_AND_NULL(clicker->name);
-	FREE_AND_NULL(clicker);
+    dh_release(&clicker->keysExchanger);
+    FREE_AND_NULL(clicker->localKey);
+    FREE_AND_NULL(clicker->remoteKey);
+    FREE_AND_NULL(clicker->sharedKey);
+    FREE_AND_NULL(clicker->psk);
+    FREE_AND_NULL(clicker->name);
+    FREE_AND_NULL(clicker);
 }
 
 static void InnerAdd(Clicker **head, Clicker *clicker)
@@ -73,7 +73,7 @@ static void InnerAdd(Clicker **head, Clicker *clicker)
 
         (*head)->next = NULL;
 
-		    sem_post(&semaphore);
+        sem_post(&semaphore);
 
         return;
     }
@@ -83,8 +83,8 @@ static void InnerAdd(Clicker **head, Clicker *clicker)
         current = current->next;
     }
     current->next = clicker;
-	  clicker->next = NULL;
-	  sem_post(&semaphore);
+    clicker->next = NULL;
+    sem_post(&semaphore);
 }
 
 static void InnerRemove(Clicker **head, Clicker *clicker, bool doLock)
@@ -163,9 +163,9 @@ Clicker *clicker_New(int socket)
     newClicker->psk = NULL;
     newClicker->ownershipsCount = 0;
     newClicker->provisionTime = 0;
-	newClicker->error = 0;
+    newClicker->error = 0;
     newClicker->provisioningInProgress = false;
-	newClicker->name = malloc(COMMAND_ENDPOINT_NAME_LENGTH);
+    newClicker->name = malloc(COMMAND_ENDPOINT_NAME_LENGTH);
 
     InnerAdd(&clickers, newClicker);
     return newClicker;
@@ -179,9 +179,9 @@ void clicker_InitSemaphore()
 void clicker_Release(Clicker *clicker)
 {
     LOG(LOG_DBG, "clicker_Release start");
-	InnerRemove(&clickers, clicker, true);
+    InnerRemove(&clickers, clicker, true);
 
-	InnerAdd(&clickersToRelease, clicker);
+    InnerAdd(&clickersToRelease, clicker);
 }
 
 //should be called in critical section
@@ -203,9 +203,9 @@ Clicker *clicker_InnerGetClickerAtIndex(int index)
 
 Clicker *clicker_GetClickerAtIndex(int index)
 {
-	sem_wait(&semaphore);
-	Clicker* result = clicker_InnerGetClickerAtIndex(index);
-	sem_post(&semaphore);
+    sem_wait(&semaphore);
+    Clicker* result = clicker_InnerGetClickerAtIndex(index);
+    sem_post(&semaphore);
     return result;
 }
 
@@ -225,16 +225,16 @@ unsigned int clicker_GetClickersCount()
 
 Clicker *clicker_GetClickerByID(int id)
 {
-	return InnerGetClickerByID(id, true);
+    return InnerGetClickerByID(id, true);
 }
 
 int clicker_GetIndexOfClicker(Clicker* clicker)
 {
-	int t = sem_trywait(&semaphore);
-	//printf("semaphor value %d\n", t);
-	if (t == 0)
-		sem_post(&semaphore);
-	sem_wait(&semaphore);
+    int t = sem_trywait(&semaphore);
+    //printf("semaphor value %d\n", t);
+    if (t == 0)
+        sem_post(&semaphore);
+    sem_wait(&semaphore);
     int i = -1;
     Clicker *head = clickers;
     while (head != NULL)
@@ -242,13 +242,13 @@ int clicker_GetIndexOfClicker(Clicker* clicker)
         i++;
         if (clicker == head)
         {
-			sem_post(&semaphore);
+            sem_post(&semaphore);
             return i;
         }
         head = head->next;
     }
-	sem_post(&semaphore);
-	return -1;
+    sem_post(&semaphore);
+    return -1;
 }
 
 Clicker *clicker_GetClickers()
@@ -259,13 +259,13 @@ Clicker *clicker_GetClickers()
 
 Clicker *clicker_AcquireOwnership(int clickerID)
 {
-	sem_wait(&semaphore);
-	Clicker *clicker = InnerGetClickerByID(clickerID, false);
-	if (clicker != NULL)
-		clicker->ownershipsCount++;
-	sem_post(&semaphore);
+    sem_wait(&semaphore);
+    Clicker *clicker = InnerGetClickerByID(clickerID, false);
+    if (clicker != NULL)
+        clicker->ownershipsCount++;
+    sem_post(&semaphore);
 
-	return clicker;
+    return clicker;
 }
 
 Clicker* clicker_AcquireOwnershipAtIndex(int index)
@@ -284,28 +284,28 @@ Clicker* clicker_AcquireOwnershipAtIndex(int index)
 
 void clicker_ReleaseOwnership(Clicker *clicker)
 {
-	sem_wait(&semaphore);
-	clicker->ownershipsCount--;
-	sem_post(&semaphore);
+    sem_wait(&semaphore);
+    clicker->ownershipsCount--;
+    sem_post(&semaphore);
 }
 
 void clicker_Purge()
 {
-	sem_wait(&semaphore);
-	Clicker *current = clickersToRelease;
-	while (current != NULL)
-	{
-		if (current->ownershipsCount <= 0)
-		{
-			Clicker *tmp = current->next;
-			InnerRemove(&clickersToRelease, current, false);
-			Destroy(current);
-			current = tmp;
-		}
-		else
-		{
-			current = current->next;
-		}
-	}
-	sem_post(&semaphore);
+    sem_wait(&semaphore);
+    Clicker *current = clickersToRelease;
+    while (current != NULL)
+    {
+        if (current->ownershipsCount <= 0)
+        {
+            Clicker *tmp = current->next;
+            InnerRemove(&clickersToRelease, current, false);
+            Destroy(current);
+            current = tmp;
+        }
+        else
+        {
+            current = current->next;
+        }
+    }
+    sem_post(&semaphore);
 }

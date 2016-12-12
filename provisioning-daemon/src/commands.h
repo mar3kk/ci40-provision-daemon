@@ -36,18 +36,18 @@
 #define COMMAND_ENDPOINT_NAME_LENGTH 24
 
 typedef enum {
-  NetworkCommand_NONE = 0,
-  NetworkCommand_ENABLE_HIGHLIGHT,
-  NetworkCommand_DISABLE_HIGHLIGHT,
-  NetworkCommand_KEEP_ALIVE,
-  NetworkCommand_KEY,
-  NetworkCommand_DEVICE_SERVER_CONFIG,
-  NetworkCommand_NETWORK_CONFIG
+    NetworkCommand_NONE = 0,
+    NetworkCommand_ENABLE_HIGHLIGHT,
+    NetworkCommand_DISABLE_HIGHLIGHT,
+    NetworkCommand_KEEP_ALIVE,
+    NetworkCommand_KEY,
+    NetworkCommand_DEVICE_SERVER_CONFIG,
+    NetworkCommand_NETWORK_CONFIG
 } NetworkCommand;
 
 typedef struct __attribute__((__packed__))
 {
-	uint8_t securityMode;
+    uint8_t securityMode;
     uint8_t pskKeySize;
     uint8_t psk[32];
     uint8_t bootstrapUri[200];
@@ -55,9 +55,9 @@ typedef struct __attribute__((__packed__))
 
 typedef struct __attribute__((__packed__))
 {
-  char defaultRouteUri[100];  //can be IPv6 or URL
-  char dnsServer[100];
-  char endpointName[COMMAND_ENDPOINT_NAME_LENGTH];
+    char defaultRouteUri[100];  //can be IPv6 or URL
+    char dnsServer[100];
+    char endpointName[COMMAND_ENDPOINT_NAME_LENGTH];
 } pd_NetworkConfig;
 
 
