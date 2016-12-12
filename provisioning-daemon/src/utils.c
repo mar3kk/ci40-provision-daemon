@@ -60,7 +60,7 @@ itoa(unsigned int num, char* str, int len, int base)
     return 0;
 }
 
-unsigned long GetCurrentTimeMillis()
+unsigned long GetCurrentTimeMillis(void)
 {
     gettimeofday(&_Timeval, NULL);
     return _Timeval.tv_sec * 1000 + _Timeval.tv_usec/1000;

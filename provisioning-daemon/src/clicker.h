@@ -94,7 +94,7 @@ Clicker *clicker_GetClickerAtIndex(int index);
  * @brief Returns count of clickers in collections.
  * @return Count of clickers
  */
-unsigned int clicker_GetClickersCount();
+unsigned int clicker_GetClickersCount(void);
 
 /**
  * @brief Get index of the list on which specified clicker is.

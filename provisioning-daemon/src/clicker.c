@@ -171,7 +171,7 @@ Clicker *clicker_New(int socket)
     return newClicker;
 }
 
-void clicker_InitSemaphore()
+void clicker_InitSemaphore(void)
 {
     sem_init(&semaphore, 0, 1);
 }
@@ -209,7 +209,7 @@ Clicker *clicker_GetClickerAtIndex(int index)
     return result;
 }
 
-unsigned int clicker_GetClickersCount()
+unsigned int clicker_GetClickersCount(void)
 {
     sem_wait(&semaphore);
     int i = 0;
@@ -251,7 +251,7 @@ int clicker_GetIndexOfClicker(Clicker* clicker)
     return -1;
 }
 
-Clicker *clicker_GetClickers()
+Clicker *clicker_GetClickers(void)
 {
     return clickers;
 }
@@ -289,7 +289,7 @@ void clicker_ReleaseOwnership(Clicker *clicker)
     sem_post(&semaphore);
 }
 
-void clicker_Purge()
+void clicker_Purge(void)
 {
     sem_wait(&semaphore);
     Clicker *current = clickersToRelease;

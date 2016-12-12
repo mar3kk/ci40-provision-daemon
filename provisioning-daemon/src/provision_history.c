@@ -52,15 +52,15 @@ typedef struct HistoryEntry_ {
 static HistoryEntry* historyHead = NULL;
 static sem_t semaphore;
 
-void history_init() {
+void history_init(void) {
     sem_init(&semaphore, 0, 1);
 }
 
-void history_destroy() {
+void history_destroy(void) {
     sem_destroy(&semaphore);
 }
 
-int getCurrentMilis () {
+int getCurrentMilis (void) {
     struct timespec spec;
     clock_gettime(CLOCK_REALTIME, &spec);
 
@@ -80,7 +80,7 @@ void history_AddAsProvisioned(int id, char* name) {
     sem_post(&semaphore);
 }
 
-void PurgeOld() {
+void PurgeOld(void){
     long current = getCurrentMilis();
     HistoryEntry* prev = NULL;
     for (HistoryEntry* tmp = historyHead; tmp != NULL; tmp = tmp->next) {

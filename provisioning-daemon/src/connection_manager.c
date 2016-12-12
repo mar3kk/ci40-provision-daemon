@@ -173,7 +173,7 @@ int con_BindAndListen(
     return 0;
 }
 
-static void CheckConnections()
+static void CheckConnections(void)
 {
     long currentTimeMillis = GetCurrentTimeMillis();
     Clicker *clicker = clicker_GetClickers();
@@ -188,7 +188,7 @@ static void CheckConnections()
     }
 }
 
-void con_ProcessConnections()
+void con_ProcessConnections(void)
 {
     int i = 0;
     int activity, sd;

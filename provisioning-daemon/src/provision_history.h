@@ -42,8 +42,8 @@ typedef struct {
     bool isErrored;
 } HistoryItem;
 
-void history_init();
-void history_destroy();
+void history_init(void);
+void history_destroy(void);
 void history_AddAsProvisioned(int id, char* name);
 void history_GetProvisioned(HistoryItem** listOfId, int* sizeOfList);
 void history_RemoveProvisioned(int id);

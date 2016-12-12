@@ -107,7 +107,7 @@ void queue_AddTask(queue_Task *task)
     sem_post(&semaphore);
 }
 
-static queue_Task *queue_PopTask()
+static queue_Task *queue_PopTask(void)
 {
     sem_wait(&semaphore);
     if (_Tasks == NULL)
@@ -264,7 +264,7 @@ void queue_ReleaseTask(queue_Task * task)
     free(task);
 }
 
-queue_Task * queue_PopResult()
+queue_Task * queue_PopResult(void)
 {
     sem_wait(&semaphore);
     queue_Task * result = _Result;

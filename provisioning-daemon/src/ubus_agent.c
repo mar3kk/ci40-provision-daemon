@@ -281,7 +281,7 @@ static void SetUBusLoopInterruption(bool state) {
     sem_post(&semaphore);
 }
 
-static void WaitForInterruptState() {
+static void WaitForInterruptState(void) {
     while(true) {
         sem_wait(&semaphore);
         bool ok = uBusInInterState;
@@ -293,7 +293,7 @@ static void WaitForInterruptState() {
     }
 }
 
-bool ubusagent_Init()
+bool ubusagent_Init(void)
 {
     sem_init(&semaphore, 0, 1);
     uloop_init();
@@ -321,7 +321,7 @@ bool ubusagent_Init()
     return true;
 }
 
-bool ubusagent_EnableRemoteControl() {
+bool ubusagent_EnableRemoteControl(void) {
     SetUBusLoopInterruption(true);
     WaitForInterruptState();
     LOG(LOG_INFO, "uBusAgent: Enabling provision control through uBus");

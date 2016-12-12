@@ -244,7 +244,7 @@ static void ClickerConnectionHandler(Clicker *clicker, char *ip)
 /**
  * @bried Set the leds according to current app state.
  */
-static void UpdateLeds()
+static void UpdateLeds(void)
 {
     //LOG(LOG_INFO, "update leds");
     int interval = (_Mode == pd_Mode_LISTENING || _Mode == pd_Mode_ERROR) ? LED_BLINK_INTERVAL_MS : P_LED_BLINK_INTERVAL_MS;
@@ -275,7 +275,7 @@ static void UpdateLeds()
 /**
  * Validates whether currently selected clicker is still valid.
  */
-static void UpdateSelectedClicker()
+static void UpdateSelectedClicker(void)
 {
     int connectedClickersCount = g_pd_ConnectedClickers;
 
@@ -310,7 +310,7 @@ static void UpdateSelectedClicker()
  * @brief Tries to change selected clicker to next one if possible.
  * @return 1 if selected clicker has been successfully changed, 0 otherwise
  */
-static int TryChangeSelectedClicker()
+static int TryChangeSelectedClicker(void)
 {
     sem_wait(&semaphore);
     LOG(LOG_DBG, "Try change selected clicker");
@@ -336,24 +336,24 @@ static int TryChangeSelectedClicker()
     return 1;
 }
 
-static void Switch1PressedCallback()
+static void Switch1PressedCallback(void)
 {
     if (_Mode == pd_Mode_LISTENING)
         _Switch1Pressed = 1;
 }
 
-static void Switch2PressedCallback()
+static void Switch2PressedCallback(void)
 {
     _Switch2Pressed = 1;
 }
 
-static void HandleButton1Press()
+static void HandleButton1Press(void)
 {
     _Switch1Pressed = 0;
     TryChangeSelectedClicker();
 }
 
-static void HandleButton2Press()
+static void HandleButton2Press(void)
 {
     _Switch2Pressed = 0;
     if (_Mode == pd_Mode_LISTENING)
@@ -373,13 +373,13 @@ static void HandleButton2Press()
     }
 }
 
-bool pd_StartProvision() {
+bool pd_StartProvision(void) {
     int tmp = _Mode;
     HandleButton2Press();
     return (_Mode == pd_Mode_LISTENING) && (_Mode != tmp);
 }
 
-static void HandleModeChanged()
+static void HandleModeChanged(void)
 {
     _ModeChanged = false;
     if (_Mode == pd_Mode_LISTENING)
@@ -390,7 +390,7 @@ static void HandleModeChanged()
         LOG(LOG_INFO, "Switched to ERROR mode");
 }
 
-int pd_GetSelectedClickerId() {
+int pd_GetSelectedClickerId(void) {
     int result = -1;
     sem_wait(&semaphore);
     if (_SelectedClicker != NULL) {
@@ -536,7 +536,7 @@ static bool ReadConfigFile(const char *filePath) {
     return true;
 }
 
-static void Daemonise()
+static void Daemonise(void)
 {
     pid_t pid;
 
@@ -632,7 +632,7 @@ static int ParseCommandArgs(int argc, char *argv[], const char **fptr)
     return 1;
 }
 
-void CleanupOnExit() {
+void CleanupOnExit(void) {
     ubusagent_Close();
     bi_releaseConst();
     queue_Stop();
