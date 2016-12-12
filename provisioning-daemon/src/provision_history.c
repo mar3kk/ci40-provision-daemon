@@ -52,15 +52,18 @@ typedef struct HistoryEntry_ {
 static HistoryEntry* historyHead = NULL;
 static sem_t semaphore;
 
-void history_init(void) {
+void history_init(void)
+{
     sem_init(&semaphore, 0, 1);
 }
 
-void history_destroy(void) {
+void history_destroy(void)
+{
     sem_destroy(&semaphore);
 }
 
-int getCurrentMilis (void) {
+int getCurrentMilis(void)
+{
     struct timespec spec;
     clock_gettime(CLOCK_REALTIME, &spec);
 
@@ -68,7 +71,8 @@ int getCurrentMilis (void) {
     return ms;
 }
 
-void history_AddAsProvisioned(int id, char* name) {
+void history_AddAsProvisioned(int id, char* name)
+{
     sem_wait(&semaphore);
     HistoryEntry* entry = malloc(sizeof(HistoryEntry));
     entry->timestamp = getCurrentMilis();
@@ -80,7 +84,8 @@ void history_AddAsProvisioned(int id, char* name) {
     sem_post(&semaphore);
 }
 
-void PurgeOld(void){
+void PurgeOld(void)
+{
     long current = getCurrentMilis();
     HistoryEntry* prev = NULL;
     for (HistoryEntry* tmp = historyHead; tmp != NULL; tmp = tmp->next) {
@@ -98,7 +103,8 @@ void PurgeOld(void){
     }
 }
 
-void history_GetProvisioned(HistoryItem** listOfId, int* sizeOfList) {
+void history_GetProvisioned(HistoryItem** listOfId, int* sizeOfList)
+{
     sem_wait(&semaphore);
     PurgeOld();
     int count = 0;
@@ -118,7 +124,8 @@ void history_GetProvisioned(HistoryItem** listOfId, int* sizeOfList) {
     sem_post(&semaphore);
 }
 
-void history_RemoveProvisioned(int id) {
+void history_RemoveProvisioned(int id)
+{
     sem_wait(&semaphore);
     HistoryEntry* prev = NULL;
     for(HistoryEntry* tmp = historyHead; tmp != NULL; tmp = tmp->next) {

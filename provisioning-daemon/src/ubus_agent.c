@@ -107,7 +107,8 @@ static const struct blobmsg_policy _GeneratePskResponsePolicy[GENERATE_PSK_RESPO
 };
 
 static int SelectMethodHandler(struct ubus_context *ctx, struct ubus_object *obj, struct ubus_request_data *req,
-        const char *method, struct blob_attr *msg) {
+        const char *method, struct blob_attr *msg)
+{
 
     struct blob_attr* argBuffer[SELECT_LAST_ENUM];
 
@@ -126,7 +127,8 @@ static int SelectMethodHandler(struct ubus_context *ctx, struct ubus_object *obj
 }
 
 static int StartProvisionMethodHandler(struct ubus_context *ctx, struct ubus_object *obj, struct ubus_request_data *req,
-        const char *method, struct blob_attr *msg) {
+        const char *method, struct blob_attr *msg)
+{
 
     LOG(LOG_DBG, "uBusAgent: Requested StartProvision");
 
@@ -234,7 +236,8 @@ static void GeneratePskResponseHandler(struct ubus_request *req, int type, struc
     return;
 }
 
-void HelperTimeoutHandler(struct uloop_timeout *t) {
+void HelperTimeoutHandler(struct uloop_timeout *t)
+{
     sem_wait(&semaphore);
     if (uBusInterruption)
         uloop_cancelled = true;
@@ -268,20 +271,23 @@ static void* PDUbusLoop(void *arg)
     return NULL;
 }
 
-static void SetUBusRunning(bool state) {
+static void SetUBusRunning(bool state)
+{
     sem_wait(&semaphore);
     uBusRunning = state;
     sem_post(&semaphore);
 }
 
-static void SetUBusLoopInterruption(bool state) {
+static void SetUBusLoopInterruption(bool state)
+{
     sem_wait(&semaphore);
     uBusInterruption = state;
     uloop_cancelled = state;
     sem_post(&semaphore);
 }
 
-static void WaitForInterruptState(void) {
+static void WaitForInterruptState(void)
+{
     while(true) {
         sem_wait(&semaphore);
         bool ok = uBusInInterState;
@@ -321,7 +327,8 @@ bool ubusagent_Init(void)
     return true;
 }
 
-bool ubusagent_EnableRemoteControl(void) {
+bool ubusagent_EnableRemoteControl(void)
+{
     SetUBusLoopInterruption(true);
     WaitForInterruptState();
     LOG(LOG_INFO, "uBusAgent: Enabling provision control through uBus");

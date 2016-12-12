@@ -79,7 +79,8 @@ void HexStringToByteArray(const char* hexstr, uint8_t * dst, size_t len)
         dst[j] = (hexstr[i] % 32 + 9) % 25 * 16 + (hexstr[i+1] % 32 + 9) % 25;
 }
 
-bool GenerateRandomX(unsigned char* array, int length) {
+bool GenerateRandomX(unsigned char* array, int length)
+{
     unsigned long seed = GetCurrentTimeMillis();
     srand(seed);
 

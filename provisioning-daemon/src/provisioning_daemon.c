@@ -369,7 +369,8 @@ static void HandleButton2Press(void)
     }
 }
 
-bool pd_StartProvision(void) {
+bool pd_StartProvision(void)
+{
     int tmp = _Mode;
     HandleButton2Press();
     return (_Mode == pd_Mode_LISTENING) && (_Mode != tmp);
@@ -386,7 +387,8 @@ static void HandleModeChanged(void)
         LOG(LOG_INFO, "Switched to ERROR mode");
 }
 
-int pd_GetSelectedClickerId(void) {
+int pd_GetSelectedClickerId(void)
+{
     int result = -1;
     sem_wait(&semaphore);
     if (_SelectedClicker != NULL)
@@ -396,7 +398,8 @@ int pd_GetSelectedClickerId(void) {
     return result;
 }
 
-int pd_SetSelectedClicker(int id) {
+int pd_SetSelectedClicker(int id)
+{
     sem_wait(&semaphore);
 
     int result = (_SelectedClicker != NULL) ? _SelectedClicker->clickerID : -1;
@@ -444,7 +447,8 @@ void TryToSendPsk(Clicker *clicker)
     }
 }
 
-static bool ReadConfigFile(const char *filePath) {
+static bool ReadConfigFile(const char *filePath)
+{
     config_init(&_Cfg);
     if(! config_read_file(&_Cfg, filePath))
     {
@@ -622,7 +626,8 @@ static int ParseCommandArgs(int argc, char *argv[], const char **fptr)
     return 1;
 }
 
-void CleanupOnExit(void) {
+void CleanupOnExit(void)
+{
     ubusagent_Close();
     bi_releaseConst();
     queue_Stop();
