@@ -35,14 +35,19 @@
 #include <sys/time.h>
 
 
-static struct timeval _Timeval;
+static const char chars[] = {
+    '0', '1', '2', '3', '4', '5', '6', '7',
+    '8', '9', 'A', 'B', 'C', 'D', 'E', 'F',
+    'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N',
+    'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V',
+    'W', 'X', 'Y', 'Z', 'a', 'b', 'c', 'd',
+    'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l',
+    'm', 'n', 'o', 'p', 'q', 'r', 's', 't',
+    'u', 'v', 'w', 'x', 'y', 'z'
+};
 
-static int
-itoa(unsigned int num, char* str, int len, int base)
+static int itoa(unsigned int num, char* str, int len, int base)
 {
-    char chars[64] = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
-                        'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
-                    'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z'};
     int sum = num;
     int i = 0;
     if (len == 0)
@@ -62,6 +67,7 @@ itoa(unsigned int num, char* str, int len, int base)
 
 unsigned long GetCurrentTimeMillis(void)
 {
+    struct timeval _Timeval;
     gettimeofday(&_Timeval, NULL);
     return _Timeval.tv_sec * 1000 + _Timeval.tv_usec/1000;
 }
