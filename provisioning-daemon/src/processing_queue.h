@@ -56,10 +56,10 @@ typedef struct queue_Task
 {
     queue_TaskType type;
     uint8_t clickerID;
-	void * inData;
-	uint8_t inDataLength;
-	void *outData;
-	uint8_t outDataLength;
+    void * inData;
+    uint8_t inDataLength;
+    void *outData;
+    uint8_t outDataLength;
     sem_t * semaphore;
     int statusCode;
     struct queue_Task *next;
@@ -75,7 +75,7 @@ void queue_AddTask( queue_Task *task);
  * @brief Pops result of last computed task.
  * @return task with field outData filled with computation result or NULL if no result is availbale yet
  */
-queue_Task * queue_PopResult();
+queue_Task * queue_PopResult(void);
 
 queue_Task * queue_NewQueueTask(queue_TaskType type, uint8_t clickerID, void * inData, uint8_t inDataLength, sem_t * sem);
 void queue_ReleaseTask(queue_Task * task);

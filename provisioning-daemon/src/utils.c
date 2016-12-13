@@ -35,33 +35,39 @@
 #include <sys/time.h>
 
 
-static struct timeval _Timeval;
+static const char chars[] = {
+    '0', '1', '2', '3', '4', '5', '6', '7',
+    '8', '9', 'A', 'B', 'C', 'D', 'E', 'F',
+    'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N',
+    'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V',
+    'W', 'X', 'Y', 'Z', 'a', 'b', 'c', 'd',
+    'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l',
+    'm', 'n', 'o', 'p', 'q', 'r', 's', 't',
+    'u', 'v', 'w', 'x', 'y', 'z'
+};
 
-static int
-itoa(unsigned int num, char* str, int len, int base)
+static int itoa(unsigned int num, char* str, int len, int base)
 {
-    char chars[64] = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
-                        'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
-                    'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z'};
-	int sum = num;
-	int i = 0;
-	if (len == 0)
-		return -1;
-	do
-	{
+    int sum = num;
+    int i = 0;
+    if (len == 0)
+        return -1;
+    do
+    {
         printf("i : %d , index : %d \n", i, sum%base);
         str[i++] = chars[sum%base];
 
-		sum /= base;
-	} while (sum && (i < (len - 1)));
-	if (i == (len - 1) && sum)
-		return -1;
-	str[i] = '\0';
-	return 0;
+        sum /= base;
+    } while (sum && (i < (len - 1)));
+    if (i == (len - 1) && sum)
+        return -1;
+    str[i] = '\0';
+    return 0;
 }
 
-unsigned long GetCurrentTimeMillis()
+unsigned long GetCurrentTimeMillis(void)
 {
+    struct timeval _Timeval;
     gettimeofday(&_Timeval, NULL);
     return _Timeval.tv_sec * 1000 + _Timeval.tv_usec/1000;
 }
@@ -73,13 +79,13 @@ void HexStringToByteArray(const char* hexstr, uint8_t * dst, size_t len)
         dst[j] = (hexstr[i] % 32 + 9) % 25 * 16 + (hexstr[i+1] % 32 + 9) % 25;
 }
 
-bool GenerateRandomX(unsigned char* array, int length) {
-  unsigned long seed = GetCurrentTimeMillis();
-  srand(seed);
+bool GenerateRandomX(unsigned char* array, int length)
+{
+    unsigned long seed = GetCurrentTimeMillis();
+    srand(seed);
 
-  for (int i = 0; i < length; ++i) {
-    array[i] = (rand()%9);
-  }
+    for (int i = 0; i < length; ++i)
+        array[i] = rand() % 9;
 
   return true;
 }
@@ -92,49 +98,55 @@ void GenerateClickerTimeHash(char *buffer)
 
 void GenerateClickerName(char* outBuffer, int maxBufLen, char *pattern, char *hash, char *ip)
 {
-  bool inBracket = false;
-  maxBufLen--;
-  while( (maxBufLen > 0) && (*pattern != 0) ) {
+    bool inBracket = false;
+    maxBufLen--;
+    while( (maxBufLen > 0) && (*pattern != 0) )
+    {
+        if (inBracket == false)
+        {
+            if (*pattern != '{')
+            {
+                *outBuffer = *pattern;
+                outBuffer++;
+                maxBufLen--;
+            }
+            else
+            {
+                inBracket = true;
+            }
+            pattern++;
 
-    if (inBracket == false) {
-      if (*pattern != '{') {
-        *outBuffer = *pattern;
-        outBuffer++;
-        maxBufLen--;
-
-      } else {
-        inBracket = true;
-      }
-      pattern++;
-
-    } else {
-      char* token = NULL;
-      char id = *pattern;
-      pattern++;
-      if ((id == 0) || (*pattern != '}')) {
-        break;
-      }
-
-      char ids[] = {'t', 'i'};
-      char* tokens[] = {hash, ip };
-      for(int t = 0; t < sizeof(ids); t++) {
-        if (ids[t] == id) {
-          token = tokens[t];
-          break;
         }
-      }
+        else
+        {
+            char* token = NULL;
+            char id = *pattern;
+            pattern++;
+            if ((id == 0) || (*pattern != '}'))
+                break;
 
-      if (token != NULL) {
-        pattern++;
-        int len = (int)strlen(token);
-        len = len > maxBufLen ? maxBufLen : len;
-        strcpy(outBuffer, token);
-        maxBufLen -= len;
-        outBuffer += len;
-        inBracket = false;
-      }
+            char ids[] = {'t', 'i'};
+            char* tokens[] = {hash, ip };
+            for(int t = 0; t < sizeof(ids); t++)
+            {
+                if (ids[t] == id)
+                {
+                    token = tokens[t];
+                    break;
+                }
+            }
 
+            if (token != NULL)
+            {
+                pattern++;
+                int len = (int)strlen(token);
+                len = len > maxBufLen ? maxBufLen : len;
+                strcpy(outBuffer, token);
+                maxBufLen -= len;
+                outBuffer += len;
+                inBracket = false;
+            }
+        }
     }
-  }
-  *outBuffer = 0;
+    *outBuffer = 0;
 }

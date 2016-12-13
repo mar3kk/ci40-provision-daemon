@@ -107,16 +107,17 @@ static const struct blobmsg_policy _GeneratePskResponsePolicy[GENERATE_PSK_RESPO
 };
 
 static int SelectMethodHandler(struct ubus_context *ctx, struct ubus_object *obj, struct ubus_request_data *req,
-        const char *method, struct blob_attr *msg) {
+        const char *method, struct blob_attr *msg)
+{
 
     struct blob_attr* argBuffer[SELECT_LAST_ENUM];
 
     blobmsg_parse(_SelectPolicy, ARRAY_SIZE(_SelectPolicy), argBuffer, blob_data(msg), blob_len(msg));
 
     uint32_t clickerId = 0xffffffff;
-    if (argBuffer[SELECT_CLICKER_ID]) {
+    if (argBuffer[SELECT_CLICKER_ID])
         clickerId = blobmsg_get_u32(argBuffer[SELECT_CLICKER_ID]);
-    }
+
     LOG(LOG_DBG, "uBusAgent: Select, move to clickerId:%d", clickerId);
 
     int returnedId = pd_SetSelectedClicker(clickerId);
@@ -126,7 +127,8 @@ static int SelectMethodHandler(struct ubus_context *ctx, struct ubus_object *obj
 }
 
 static int StartProvisionMethodHandler(struct ubus_context *ctx, struct ubus_object *obj, struct ubus_request_data *req,
-        const char *method, struct blob_attr *msg) {
+        const char *method, struct blob_attr *msg)
+{
 
     LOG(LOG_DBG, "uBusAgent: Requested StartProvision");
 
@@ -153,7 +155,8 @@ static int GetStateMethodHandler(struct ubus_context *ctx, struct ubus_object *o
 
     blob_buf_init(&replyBloob, 0);
     void* cookie_array = blobmsg_open_array(&replyBloob, "clickers");
-    for(int t = 0; t < historyCount; t++) {
+    for(int t = 0; t < historyCount; t++)
+    {
         void* cookie_item = blobmsg_open_table(&replyBloob, "clicker");
 
         blobmsg_add_u32(&replyBloob, "id", history[t].id);
@@ -167,20 +170,24 @@ static int GetStateMethodHandler(struct ubus_context *ctx, struct ubus_object *o
 
     bool alreadyProvisioned = false;
 
-    for(int t = 0; t < clickersCount; t++) {
+    for(int t = 0; t < clickersCount; t++)
+    {
         Clicker* clk = clicker_AcquireOwnershipAtIndex(t);
-        if (clk == NULL) {
+        if (clk == NULL)
             continue;
-        }
+
         alreadyProvisioned = false;
-        for(int j = 0; j < historyCount; j++) {
-            if (history[j].id == clk->clickerID) {
+        for(int j = 0; j < historyCount; j++)
+        {
+            if (history[j].id == clk->clickerID)
+            {
                 alreadyProvisioned = true;
                 break;
             }
         }
 
-        if (alreadyProvisioned) {
+        if (alreadyProvisioned)
+        {
             clicker_ReleaseOwnership(clk);
             continue;
         }
@@ -234,11 +241,12 @@ static void GeneratePskResponseHandler(struct ubus_request *req, int type, struc
     return;
 }
 
-void HelperTimeoutHandler(struct uloop_timeout *t) {
+void HelperTimeoutHandler(struct uloop_timeout *t)
+{
     sem_wait(&semaphore);
-    if (uBusInterruption) {
+    if (uBusInterruption)
         uloop_cancelled = true;
-    }
+
     sem_post(&semaphore);
     uloop_timeout_set(&uBusHelperProcess, 500);
 }
@@ -246,14 +254,17 @@ void HelperTimeoutHandler(struct uloop_timeout *t) {
 static void* PDUbusLoop(void *arg)
 {
     LOG(LOG_INFO, "uBusAgent: uBus thread started.\n");
-    while(true) {
+    while(true)
+    {
         sem_wait(&semaphore);
-        if (uBusRunning == false) {
+        if (uBusRunning == false)
+        {
             sem_post(&semaphore);
             break;
         }
 
-        while(uBusInterruption) {
+        while(uBusInterruption)
+        {
             uBusInInterState = true;
             LOG(LOG_INFO, "Interrupt state");
             sem_post(&semaphore);
@@ -268,32 +279,36 @@ static void* PDUbusLoop(void *arg)
     return NULL;
 }
 
-static void SetUBusRunning(bool state) {
+static void SetUBusRunning(bool state)
+{
     sem_wait(&semaphore);
     uBusRunning = state;
     sem_post(&semaphore);
 }
 
-static void SetUBusLoopInterruption(bool state) {
+static void SetUBusLoopInterruption(bool state)
+{
     sem_wait(&semaphore);
     uBusInterruption = state;
     uloop_cancelled = state;
     sem_post(&semaphore);
 }
 
-static void WaitForInterruptState() {
-    while(true) {
+static void WaitForInterruptState(void)
+{
+    while(true)
+    {
         sem_wait(&semaphore);
         bool ok = uBusInInterState;
         sem_post(&semaphore);
-        if (ok) {
+        if (ok)
             break;
-        }
+
         usleep(200 * 1000);
     }
 }
 
-bool ubusagent_Init()
+bool ubusagent_Init(void)
 {
     sem_init(&semaphore, 0, 1);
     uloop_init();
@@ -321,14 +336,15 @@ bool ubusagent_Init()
     return true;
 }
 
-bool ubusagent_EnableRemoteControl() {
+bool ubusagent_EnableRemoteControl(void)
+{
     SetUBusLoopInterruption(true);
-	WaitForInterruptState();
-	LOG(LOG_INFO, "uBusAgent: Enabling provision control through uBus");
+    WaitForInterruptState();
+    LOG(LOG_INFO, "uBusAgent: Enabling provision control through uBus");
     int ret = ubus_add_object(_UbusCTX, &_UBusAgentObject);
-    if (ret) {
+    if (ret)
         LOG(LOG_ERR, "uBusAgent: Failed to add object: %s\n", ubus_strerror(ret));
-    }
+
     SetUBusLoopInterruption(false);
 
     return ret == 0;
@@ -338,9 +354,9 @@ void ubusagent_Close(void)
 {
     SetUBusLoopInterruption(false);
     SetUBusRunning(false);
-    if (_UbusCTX) {
+    if (_UbusCTX)
         ubus_free(_UbusCTX);
-    }
+
     uloop_done();
     sem_destroy(&semaphore);
 }

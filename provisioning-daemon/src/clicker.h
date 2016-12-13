@@ -55,7 +55,7 @@ typedef struct Clicker
     uint8_t *remoteKey;                    /**< Exchange key received from remote clicker */
     uint8_t *sharedKey;                 /**< shared key used to encrypt communication with remote clicker */
     uint8_t *psk;                       /**< psk received from device server */
-   	bool taskInProgress;
+    bool taskInProgress;
     DiffieHellmanKeysExchanger *keysExchanger; /**< struct used to exchange crypto keys between provisioning daemon and remote clicker */
     sem_t * semaphore;                  /**< semaphore that shpuld be used to synchronize operations on this struct fields */
     uint8_t ownershipsCount;
@@ -94,7 +94,7 @@ Clicker *clicker_GetClickerAtIndex(int index);
  * @brief Returns count of clickers in collections.
  * @return Count of clickers
  */
-unsigned int clicker_GetClickersCount();
+unsigned int clicker_GetClickersCount(void);
 
 /**
  * @brief Get index of the list on which specified clicker is.

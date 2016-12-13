@@ -59,29 +59,30 @@ static uint8_t _PskLen = 0;
 
 
 
-static void GeneratePskCallback(char *psk, uint8_t pskLen, pdubus_GeneratePskRequest *request)
+static void GeneratePskCallback(char *psk, uint8_t pskLen, void *arg)
 {
+    pdubus_GeneratePskRequest *request = (pdubus_GeneratePskRequest*)arg;
+    queue_Task *task = request->priv;
+    if (psk == NULL)
+    {
+        task->outData = NULL;
+        task->outDataLength = 0;
+        sem_wait(&semaphore);
+        _Result = task;
+        FREE_AND_NULL(request);
+        sem_post(&semaphore);
 
-	queue_Task *task = request->priv;
-	if (psk == NULL) {
-		task->outData = NULL;
-		task->outDataLength = 0;
-		sem_wait(&semaphore);
-		_Result = task;
-		FREE_AND_NULL(request);
-		sem_post(&semaphore);
-
-		return;
-	}
-	sem_wait(&semaphore);
+        return;
+    }
+    sem_wait(&semaphore);
     _Psk = malloc(pskLen+1);
     strncpy(_Psk, psk, pskLen+1);
-	_PskLen = pskLen;
-	task->outData = _Psk;
-	task->outDataLength = pskLen+1;
-	_Result = task;
-	FREE_AND_NULL(request);
-	sem_post(&semaphore);
+    _PskLen = pskLen;
+    task->outData = _Psk;
+    task->outDataLength = pskLen+1;
+    _Result = task;
+    FREE_AND_NULL(request);
+    sem_post(&semaphore);
 
 }
 
@@ -90,29 +91,28 @@ void queue_AddTask(queue_Task *task)
     sem_wait(&semaphore);
     if (_Tasks == NULL)
     {
-		_Tasks = task;
-		sem_post(&semaphore);
-		return;
+        _Tasks = task;
+        sem_post(&semaphore);
+        return;
     }
 
     queue_Task *current = _Tasks;
 
     while (current->next != NULL)
-    {
          current = current->next;
-    }
+
     current->next = task;
-	task->next = NULL;
+    task->next = NULL;
 
     sem_post(&semaphore);
 }
 
-static queue_Task *queue_PopTask()
+static queue_Task *queue_PopTask(void)
 {
     sem_wait(&semaphore);
     if (_Tasks == NULL)
     {
-		sem_post(&semaphore);
+        sem_post(&semaphore);
         return NULL;
     }
     queue_Task *task = _Tasks;
@@ -124,54 +124,51 @@ static queue_Task *queue_PopTask()
 
 static void queue_HandleGeneratelocalKey(queue_Task *task)
 {
-	Clicker *clicker = clicker_AcquireOwnership(task->clickerID);
+    Clicker *clicker = clicker_AcquireOwnership(task->clickerID);
     sem_wait(&semaphore);
-	DiffieHellmanKeysExchanger *keysExchanger = clicker->keysExchanger;
-	task->outData = (void*)dh_generateExchangeData(keysExchanger);
+    DiffieHellmanKeysExchanger *keysExchanger = clicker->keysExchanger;
+    task->outData = (void*)dh_generateExchangeData(keysExchanger);
 
-	task->outDataLength = keysExchanger->pModuleLength;
+    task->outDataLength = keysExchanger->pModuleLength;
 
-	_Result = task;
-	sem_post(&semaphore);
-	clicker_ReleaseOwnership(clicker);
+    _Result = task;
+    sem_post(&semaphore);
+    clicker_ReleaseOwnership(clicker);
 }
 
 static void queue_HandleGeneratePsk(queue_Task *task)
 {
-	unsigned long currentTime = GetCurrentTimeMillis();
+    unsigned long currentTime = GetCurrentTimeMillis();
     sem_wait(&semaphore);
-	_Psk = NULL;
+    _Psk = NULL;
     sem_post(&semaphore);
 
-//toster	pdubus_Init();
+    pdubus_GeneratePskRequest *request;
+    request = malloc(sizeof(pdubus_GeneratePskRequest));
+    request->callback = GeneratePskCallback;
+    request->priv = task;
+    if (ubusagent_SendGeneratePskMessage(request) == false)
+    {
+        sem_wait(&semaphore);
+        task->outData = NULL;
+        task->outDataLength = 0;
+        _Result = task;
+        sem_post(&semaphore);
+        FREE_AND_NULL(request);
+    }
 
-	pdubus_GeneratePskRequest *request;
-	request = malloc(sizeof(pdubus_GeneratePskRequest));
-	request->callback = GeneratePskCallback;
-	request->priv = task;
-	if (ubusagent_SendGeneratePskMessage(request) == false)
-	{
-		sem_wait(&semaphore);
-		task->outData = NULL;
-		task->outDataLength = 0;
-	    _Result = task;
-	    sem_post(&semaphore);
-		FREE_AND_NULL(request);
-	}
-
-//toster	pdubus_Close();
 }
 
 static void queue_HandleGenerateSharedKey(queue_Task *task)
 {
-	Clicker *clicker = clicker_AcquireOwnership(task->clickerID);
+    Clicker *clicker = clicker_AcquireOwnership(task->clickerID);
     DiffieHellmanKeysExchanger *keysExchanger = clicker->keysExchanger;
-	task->outData = (void*)dh_completeExchangeData(keysExchanger, clicker->remoteKey, keysExchanger->pModuleLength);
-	task->outDataLength = keysExchanger->pModuleLength;
-	sem_wait(&semaphore);
-	_Result = task;
-	sem_post(&semaphore);
-	clicker_ReleaseOwnership(clicker);
+    task->outData = (void*)dh_completeExchangeData(keysExchanger, clicker->remoteKey, keysExchanger->pModuleLength);
+    task->outDataLength = keysExchanger->pModuleLength;
+    sem_wait(&semaphore);
+    _Result = task;
+    sem_post(&semaphore);
+    clicker_ReleaseOwnership(clicker);
 
 }
 
@@ -180,17 +177,16 @@ static void queue_HandleTask(queue_Task *task)
     switch (task->type)
     {
         case queue_TaskType_GENERATE_ALICE_KEY:
-	    	queue_HandleGeneratelocalKey(task);
-		    break;
-		case queue_TaskType_GENERATE_PSK:
-			queue_HandleGeneratePsk(task);
-			break;
-		case queue_TaskType_GENERATE_SHARED_KEY:
-			queue_HandleGenerateSharedKey(task);
-			break;
-	default:
-	    break;
-
+            queue_HandleGeneratelocalKey(task);
+            break;
+        case queue_TaskType_GENERATE_PSK:
+            queue_HandleGeneratePsk(task);
+            break;
+        case queue_TaskType_GENERATE_SHARED_KEY:
+            queue_HandleGenerateSharedKey(task);
+            break;
+        default:
+            break;
     }
 }
 
@@ -203,47 +199,41 @@ static void * queue_Loop(void *arg)
 
     while (keepRunning)
     {
-		sem_wait(&semaphore);
-		queue_Task* t = _Tasks;
+        sem_wait(&semaphore);
+        queue_Task* t = _Tasks;
         queue_Task* r = _Result;
-		sem_post(&semaphore);
+        sem_post(&semaphore);
         if (t != NULL && r == NULL)
-        {
              queue_HandleTask(queue_PopTask());
-        }
-		usleep(1000 * 200);
+
+        usleep(1000 * 200);
         sem_wait(&semaphore);
         keepRunning = _KeepRunning;
         sem_post(&semaphore);
     }
-//    LOG(LOG_INFO,"A");
-//    sem_close(&semaphore);
-//    LOG(LOG_INFO,"B");
+
     return NULL;
 }
 
 queue_Task *queue_NewQueueTask(queue_TaskType type, uint8_t clickerID, void * inData, uint8_t inDataLength, sem_t * sem)
 {
-	queue_Task * newTask = malloc(sizeof(queue_Task));
-	newTask->type = type;
-	newTask->clickerID = clickerID;
-	newTask->inData = inData;
-	newTask->inDataLength = inDataLength;
-	newTask->outData = NULL;
-	newTask->outDataLength = 0;
-	newTask->semaphore = sem;
-	newTask->next = NULL;
-	return newTask;
+    queue_Task * newTask = malloc(sizeof(queue_Task));
+    newTask->type = type;
+    newTask->clickerID = clickerID;
+    newTask->inData = inData;
+    newTask->inDataLength = inDataLength;
+    newTask->outData = NULL;
+    newTask->outDataLength = 0;
+    newTask->semaphore = sem;
+    newTask->next = NULL;
+    return newTask;
 }
 
 void queue_Start(void)
 {
-
     sem_init(&semaphore, 0, 1);
     if (pthread_create(&_QueueThread, NULL, queue_Loop, NULL) < 0)
-    {
-		LOG(LOG_DBG, "Error starting queue thread");
-    }
+        LOG(LOG_DBG, "Error starting queue thread");
 }
 
 void queue_Stop(void)
@@ -255,20 +245,20 @@ void queue_Stop(void)
 
 void queue_ReleaseTask(queue_Task * task)
 {
-	if (task == NULL)
-		return;
-	if (task->inData != NULL)
-		free(task->inData);
-	if (task->outData != NULL)
-		free(task->outData);
-	free(task);
+    if (task == NULL)
+        return;
+    if (task->inData != NULL)
+        free(task->inData);
+    if (task->outData != NULL)
+        free(task->outData);
+    free(task);
 }
 
-queue_Task * queue_PopResult()
+queue_Task * queue_PopResult(void)
 {
-	sem_wait(&semaphore);
-	queue_Task * result = _Result;
-	_Result = NULL;
+    sem_wait(&semaphore);
+    queue_Task * result = _Result;
+    _Result = NULL;
     sem_post(&semaphore);
-	return result;
+    return result;
 }

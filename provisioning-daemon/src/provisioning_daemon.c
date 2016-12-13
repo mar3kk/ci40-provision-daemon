@@ -55,6 +55,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <sys/stat.h>
 #include <sys/types.h>
 #include <errno.h>
 #include <stdint.h>
@@ -68,10 +69,10 @@
 /** Calculate size of array. */
 #define ARRAY_SIZE(x) ((sizeof x) / (sizeof *x))
 
-#define LED_BLINK_INTERVAL_MS 					(500)
-#define P_LED_BLINK_INTERVAL_MS 				(100)
-#define HIGHLIGHT_INTERVAL_MS					(500)
-#define DEFAULT_PATH_CONFIG_FILE				"/etc/config/provisioning_daemon"
+#define LED_BLINK_INTERVAL_MS                     (500)
+#define P_LED_BLINK_INTERVAL_MS                 (100)
+#define HIGHLIGHT_INTERVAL_MS                    (500)
+#define DEFAULT_PATH_CONFIG_FILE                "/etc/config/provisioning_daemon"
 
 
 #define CONFIG_BOOTSTRAP_URI                    "coaps://deviceserver.creatordev.io:15684"
@@ -91,20 +92,20 @@
  * Describes states provisioning daemon can be in.
  */
 typedef enum {
-	pd_Mode_LISTENING, // no provisioning being performed, in this state user can choose clicker to provision
-	pd_Mode_PROVISIONING, // provisioning has been started
-	pd_Mode_ERROR
+    pd_Mode_LISTENING, // no provisioning being performed, in this state user can choose clicker to provision
+    pd_Mode_PROVISIONING, // provisioning has been started
+    pd_Mode_ERROR
 } pd_Mode;
 
 typedef struct {
-	int tcpPort;
-	const char *defaultRouteUri;
-	const char *bootstrapUri;
-	const char *dnsServer;
-	const char *endPointNamePattern;
-	int logLevel;
-	int localProvisionControl;
-	int remoteProvisionControl;
+    int tcpPort;
+    const char *defaultRouteUri;
+    const char *bootstrapUri;
+    const char *dnsServer;
+    const char *endPointNamePattern;
+    int logLevel;
+    int localProvisionControl;
+    int remoteProvisionControl;
 } pd_Config;
 
 
@@ -155,14 +156,14 @@ static pd_NetworkConfig _NetworkConfig;
 static config_t _Cfg;
 
 pd_Config _PDConfig = {
-		.tcpPort = 0,
-		.defaultRouteUri = NULL,
-		.bootstrapUri = NULL,
-		.dnsServer = NULL,
-		.endPointNamePattern = NULL,
-		.logLevel = 0,
-		.localProvisionControl = false,
-		.remoteProvisionControl = false
+    .tcpPort = 0,
+    .defaultRouteUri = NULL,
+    .bootstrapUri = NULL,
+    .dnsServer = NULL,
+    .endPointNamePattern = NULL,
+    .logLevel = 0,
+    .localProvisionControl = false,
+    .remoteProvisionControl = false
 };
 
 static sem_t semaphore;
@@ -187,17 +188,17 @@ static void CtrlCHandler(int signal)
  */
 static void HandleKeepAliveCommand(Clicker *clicker)
 {
-	clicker->lastKeepAliveTime = GetCurrentTimeMillis();
+    clicker->lastKeepAliveTime = GetCurrentTimeMillis();
 }
 
 static void HandleKeyCommand(Clicker *clicker, uint8_t *data)
 {
-	uint8_t dataLength = data[1];
-	if (clicker->remoteKey != NULL)
-		FREE_AND_NULL(clicker->remoteKey);
-	clicker->remoteKey = malloc(dataLength);
-	memcpy(clicker->remoteKey, &data[2], dataLength);
-	LOG(LOG_INFO, "Received exchange key from clicker : %d", clicker->clickerID);
+    uint8_t dataLength = data[1];
+    if (clicker->remoteKey != NULL)
+        FREE_AND_NULL(clicker->remoteKey);
+    clicker->remoteKey = malloc(dataLength);
+    memcpy(clicker->remoteKey, &data[2], dataLength);
+    LOG(LOG_INFO, "Received exchange key from clicker : %d", clicker->clickerID);
     PRINT_BYTES(clicker->remoteKey, P_MODULE_LENGTH);
 
 }
@@ -209,12 +210,12 @@ static void CommandHandler(Clicker *clicker, uint8_t *buffer)
 {
     switch (buffer[0]) {
         case NetworkCommand_KEEP_ALIVE:
-			LOG(LOG_DBG, "Received KEEP_ALIVE command");
+            LOG(LOG_DBG, "Received KEEP_ALIVE command");
             HandleKeepAliveCommand(clicker);
             break;
-		case NetworkCommand_KEY:
-			LOG(LOG_DBG, "Received KEY command");
-			HandleKeyCommand(clicker, buffer);
+        case NetworkCommand_KEY:
+            LOG(LOG_DBG, "Received KEY command");
+            HandleKeyCommand(clicker, buffer);
             break;
         default:
             LOG(LOG_WARN, "Unknown command received : %d", buffer[0]);
@@ -224,8 +225,8 @@ static void CommandHandler(Clicker *clicker, uint8_t *buffer)
 
 static void ClickerDisconnectionHandler(Clicker *clicker)
 {
-	if (_SelectedClicker == clicker)
-		_SelectedClicker = NULL;
+    if (_SelectedClicker == clicker)
+        _SelectedClicker = NULL;
 }
 
 static void ClickerConnectionHandler(Clicker *clicker, char *ip)
@@ -236,71 +237,67 @@ static void ClickerConnectionHandler(Clicker *clicker, char *ip)
     char ipFragment[5];
     memset(ipFragment, 0, 5);
     strncpy(ipFragment, ip + strlen(ip) - 4, 4);
-    GenerateClickerName(clicker->name, COMMAND_ENDPOINT_NAME_LENGTH, _PDConfig.endPointNamePattern, hash, ipFragment);
+    GenerateClickerName(clicker->name, COMMAND_ENDPOINT_NAME_LENGTH, (char*)_PDConfig.endPointNamePattern, hash, ipFragment);
     LOG(LOG_INFO, "New clicker connected, ip : %s, id : %d, name : %s", ip, clicker->clickerID, clicker->name);
 }
 
 /**
  * @bried Set the leds according to current app state.
  */
-static void UpdateLeds()
+static void UpdateLeds(void)
 {
-	//LOG(LOG_INFO, "update leds");
     int interval = (_Mode == pd_Mode_LISTENING || _Mode == pd_Mode_ERROR) ? LED_BLINK_INTERVAL_MS : P_LED_BLINK_INTERVAL_MS;
-	unsigned long currentTime = GetCurrentTimeMillis();
-	if (currentTime - _LastBlinkTime > interval)
-	{
-		_LastBlinkTime = currentTime;
-		if (g_activeLedOn)
-			g_activeLedOn = 0;
-		else
-			g_activeLedOn = 1;
-	}
-	// LOG(LOG_INFO, "update leds 1");
-	if (_Mode == pd_Mode_ERROR)
-	{
-		if (g_activeLedOn)
-			SetAllLeds(true);
-		else
-			SetAllLeds(false);
-	}
-	else
-	{
-		// LOG(LOG_INFO, "update leds noerror");
-		SetLeds(g_pd_ConnectedClickers, clicker_GetIndexOfClicker(_SelectedClicker), g_activeLedOn);
-	}
+    unsigned long currentTime = GetCurrentTimeMillis();
+    if (currentTime - _LastBlinkTime > interval)
+    {
+        _LastBlinkTime = currentTime;
+        if (g_activeLedOn)
+            g_activeLedOn = 0;
+        else
+            g_activeLedOn = 1;
+    }
+
+    if (_Mode == pd_Mode_ERROR)
+    {
+        if (g_activeLedOn)
+            SetAllLeds(true);
+        else
+            SetAllLeds(false);
+    }
+    else
+    {
+        SetLeds(g_pd_ConnectedClickers, clicker_GetIndexOfClicker(_SelectedClicker), g_activeLedOn);
+    }
 }
 
 /**
  * Validates whether currently selected clicker is still valid.
  */
-static void UpdateSelectedClicker()
+static void UpdateSelectedClicker(void)
 {
-	int connectedClickersCount = g_pd_ConnectedClickers;
+    int connectedClickersCount = g_pd_ConnectedClickers;
 
-	// if there are no connected clickers reset selected clicker
-	if (connectedClickersCount == 0)
-	{
-		_SelectedClicker = NULL;
-		return;
-	}
-	// if there are connected clickers but we have not selected any yet
-	// select first clicker
-	if (_SelectedClicker == NULL)
-	{
-		_SelectedClicker = clicker_GetClickerAtIndex(0);
-		_SelectedClickerChanged = 1;
-		return;
-	}
-	if (clicker_GetIndexOfClicker(_SelectedClicker) > connectedClickersCount -1)
-	{
-		if (_SelectedClicker->next != NULL)
-			_SelectedClicker = _SelectedClicker->next;
-		else
-		{
-			_SelectedClicker = clicker_GetClickerAtIndex(0);
-		}
-	}
+    // if there are no connected clickers reset selected clicker
+    if (connectedClickersCount == 0)
+    {
+        _SelectedClicker = NULL;
+        return;
+    }
+    // if there are connected clickers but we have not selected any yet
+    // select first clicker
+    if (_SelectedClicker == NULL)
+    {
+        _SelectedClicker = clicker_GetClickerAtIndex(0);
+        _SelectedClickerChanged = 1;
+        return;
+    }
+    if (clicker_GetIndexOfClicker(_SelectedClicker) > connectedClickersCount -1)
+    {
+        if (_SelectedClicker->next != NULL)
+            _SelectedClicker = _SelectedClicker->next;
+        else
+            _SelectedClicker = clicker_GetClickerAtIndex(0);
+    }
 }
 
 
@@ -309,11 +306,11 @@ static void UpdateSelectedClicker()
  * @brief Tries to change selected clicker to next one if possible.
  * @return 1 if selected clicker has been successfully changed, 0 otherwise
  */
-static int TryChangeSelectedClicker()
+static int TryChangeSelectedClicker(void)
 {
     sem_wait(&semaphore);
     LOG(LOG_DBG, "Try change selected clicker");
-	int connectedClickersCount = g_pd_ConnectedClickers;
+    int connectedClickersCount = g_pd_ConnectedClickers;
     if (connectedClickersCount == 0)
     {
         LOG(LOG_DBG, "End try change selected clicker 1");
@@ -321,38 +318,38 @@ static int TryChangeSelectedClicker()
         return 0;
     }
     if (_SelectedClicker->next == NULL)
-	{
+    {
         _SelectedClicker = clicker_GetClickerAtIndex(0);
         _SelectedClickerChanged = 1;
         LOG(LOG_DBG, "End try change selected clicker 2");
         sem_post(&semaphore);
-		return 1;
-	}
-	_SelectedClicker = _SelectedClicker->next;
-	_SelectedClickerChanged = 1;
+        return 1;
+    }
+    _SelectedClicker = _SelectedClicker->next;
+    _SelectedClickerChanged = 1;
     LOG(LOG_DBG, "End try change selected clicker 3");
     sem_post(&semaphore);
-	return 1;
+    return 1;
 }
 
-static void Switch1PressedCallback()
+static void Switch1PressedCallback(void)
 {
     if (_Mode == pd_Mode_LISTENING)
         _Switch1Pressed = 1;
 }
 
-static void Switch2PressedCallback()
+static void Switch2PressedCallback(void)
 {
     _Switch2Pressed = 1;
 }
 
-static void HandleButton1Press()
+static void HandleButton1Press(void)
 {
     _Switch1Pressed = 0;
     TryChangeSelectedClicker();
 }
 
-static void HandleButton2Press()
+static void HandleButton2Press(void)
 {
     _Switch2Pressed = 0;
     if (_Mode == pd_Mode_LISTENING)
@@ -372,39 +369,43 @@ static void HandleButton2Press()
     }
 }
 
-bool pd_StartProvision() {
+bool pd_StartProvision(void)
+{
     int tmp = _Mode;
     HandleButton2Press();
     return (_Mode == pd_Mode_LISTENING) && (_Mode != tmp);
 }
 
-static void HandleModeChanged()
+static void HandleModeChanged(void)
 {
     _ModeChanged = false;
     if (_Mode == pd_Mode_LISTENING)
         LOG(LOG_INFO, "Switched to LISTENING mode");
     else if (_Mode == pd_Mode_PROVISIONING)
         LOG(LOG_INFO, "Started provisioning of clicker with id : %d", _SelectedClicker->clickerID);
-	else
-		LOG(LOG_INFO, "Switched to ERROR mode");
+    else
+        LOG(LOG_INFO, "Switched to ERROR mode");
 }
 
-int pd_GetSelectedClickerId() {
+int pd_GetSelectedClickerId(void)
+{
     int result = -1;
     sem_wait(&semaphore);
-    if (_SelectedClicker != NULL) {
+    if (_SelectedClicker != NULL)
         result = _SelectedClicker->clickerID;
-    }
+
     sem_post(&semaphore);
     return result;
 }
 
-int pd_SetSelectedClicker(int id) {
+int pd_SetSelectedClicker(int id)
+{
     sem_wait(&semaphore);
 
     int result = (_SelectedClicker != NULL) ? _SelectedClicker->clickerID : -1;
     Clicker* tmp = clicker_GetClickerByID(id);
-    if (tmp != NULL) {
+    if (tmp != NULL)
+    {
         _SelectedClicker = tmp;
         result = tmp->clickerID;
         _SelectedClickerChanged = 1;
@@ -415,22 +416,22 @@ int pd_SetSelectedClicker(int id) {
 
 void TryToSendPsk(Clicker *clicker)
 {
-	if (clicker->sharedKey != NULL && clicker->psk != NULL)
-	{
-		memset(&_DeviceServerConfig, 0, sizeof(_DeviceServerConfig));
-		_DeviceServerConfig.securityMode = 0;
-		memcpy(_DeviceServerConfig.psk, clicker->psk, P_MODULE_LENGTH);
-		_DeviceServerConfig.pskKeySize = P_MODULE_LENGTH;
+    if (clicker->sharedKey != NULL && clicker->psk != NULL)
+    {
+        memset(&_DeviceServerConfig, 0, sizeof(_DeviceServerConfig));
+        _DeviceServerConfig.securityMode = 0;
+        memcpy(_DeviceServerConfig.psk, clicker->psk, P_MODULE_LENGTH);
+        _DeviceServerConfig.pskKeySize = P_MODULE_LENGTH;
 
-		memcpy(_DeviceServerConfig.bootstrapUri, _PDConfig.bootstrapUri, strnlen(_PDConfig.bootstrapUri, 200));
-		uint8_t dataLen = 0;
-		uint8_t *encodedData = softap_encodeBytes((uint8_t *)&_DeviceServerConfig, sizeof(_DeviceServerConfig) , clicker->sharedKey, &dataLen);
+        memcpy(_DeviceServerConfig.bootstrapUri, _PDConfig.bootstrapUri, strnlen(_PDConfig.bootstrapUri, 200));
+        uint8_t dataLen = 0;
+        uint8_t *encodedData = softap_encodeBytes((uint8_t *)&_DeviceServerConfig, sizeof(_DeviceServerConfig) , clicker->sharedKey, &dataLen);
         LOG(LOG_INFO, "Sending Device Server Config to clicker with id : %d", clicker->clickerID);
-		con_SendCommandWithData(clicker, NetworkCommand_DEVICE_SERVER_CONFIG, encodedData, dataLen);
+        con_SendCommandWithData(clicker, NetworkCommand_DEVICE_SERVER_CONFIG, encodedData, dataLen);
         LOG(LOG_INFO, "Sent Device Server Config to clicker with id : %d", clicker->clickerID);
-		FREE_AND_NULL(encodedData);
+        FREE_AND_NULL(encodedData);
 
-		memset(&_NetworkConfig, 0, sizeof(_NetworkConfig));
+        memset(&_NetworkConfig, 0, sizeof(_NetworkConfig));
         memcpy(&_NetworkConfig.defaultRouteUri, _PDConfig.defaultRouteUri, strnlen(_PDConfig.defaultRouteUri, 100));
         memcpy(&_NetworkConfig.dnsServer, _PDConfig.dnsServer, strnlen(_PDConfig.dnsServer, 100));
         memcpy(&_NetworkConfig.endpointName, _PDConfig.endPointNamePattern, strnlen(_PDConfig.endPointNamePattern, 24));
@@ -444,11 +445,11 @@ void TryToSendPsk(Clicker *clicker)
         LOG(LOG_INFO, "Provisioning of clicker with id : %d finished, going back to LISTENING mode", clicker->clickerID);
         clicker->provisionTime = GetCurrentTimeMillis();
         clicker->provisioningInProgress = false;
-	}
+    }
 }
 
-static bool ReadConfigFile(const char *filePath) {
-
+static bool ReadConfigFile(const char *filePath)
+{
     config_init(&_Cfg);
     if(! config_read_file(&_Cfg, filePath))
     {
@@ -465,52 +466,52 @@ static bool ReadConfigFile(const char *filePath) {
         }
     }
 
-	if (_PDConfig.defaultRouteUri == NULL)
-	{
-		if(!config_lookup_string(&_Cfg, "DEFAULT_ROUTE_URI", &_PDConfig.defaultRouteUri))
-		{
-			LOG(LOG_ERR, "Config file does not contain DEFAULT_ROUTE_URI property");
-			return false;
-		}
-	}
+    if (_PDConfig.defaultRouteUri == NULL)
+    {
+        if(!config_lookup_string(&_Cfg, "DEFAULT_ROUTE_URI", &_PDConfig.defaultRouteUri))
+        {
+            LOG(LOG_ERR, "Config file does not contain DEFAULT_ROUTE_URI property");
+            return false;
+        }
+    }
 
-	if (_PDConfig.dnsServer == NULL)
-	{
-		if(!config_lookup_string(&_Cfg, "DNS_SERVER", &_PDConfig.dnsServer))
-		{
-			LOG(LOG_ERR, "Config file does not contain DNS_SERVER property.");
-			return false;
-		}
-	}
+    if (_PDConfig.dnsServer == NULL)
+    {
+        if(!config_lookup_string(&_Cfg, "DNS_SERVER", &_PDConfig.dnsServer))
+        {
+            LOG(LOG_ERR, "Config file does not contain DNS_SERVER property.");
+            return false;
+        }
+    }
 
-	if (_PDConfig.endPointNamePattern == NULL)
-	{
-		if(!config_lookup_string(&_Cfg, "ENDPOINT_NAME_PATTERN", &_PDConfig.endPointNamePattern))
-		{
-			LOG(LOG_ERR, "Config file does not contain ENDPOINT_NAME_PATTERN property, using default:%s.",
-			        CONFIG_DEFAULT_ENDPOINT_PATTERN);
-			_PDConfig.endPointNamePattern = CONFIG_DEFAULT_ENDPOINT_PATTERN;
-		}
-	}
+    if (_PDConfig.endPointNamePattern == NULL)
+    {
+        if(!config_lookup_string(&_Cfg, "ENDPOINT_NAME_PATTERN", &_PDConfig.endPointNamePattern))
+        {
+            LOG(LOG_ERR, "Config file does not contain ENDPOINT_NAME_PATTERN property, using default:%s.",
+                    CONFIG_DEFAULT_ENDPOINT_PATTERN);
+            _PDConfig.endPointNamePattern = CONFIG_DEFAULT_ENDPOINT_PATTERN;
+        }
+    }
 
-	if (_PDConfig.logLevel == 0)
-	{
-		if(!config_lookup_int(&_Cfg, "LOG_LEVEL", &_PDConfig.logLevel))
-		{
-			LOG(LOG_ERR, "Config file does not contain LOG_LEVEL property. Using default value: Warning");
-			_PDConfig.logLevel = LOG_WARN;
-		}
-	}
+    if (_PDConfig.logLevel == 0)
+    {
+        if(!config_lookup_int(&_Cfg, "LOG_LEVEL", &_PDConfig.logLevel))
+        {
+            LOG(LOG_ERR, "Config file does not contain LOG_LEVEL property. Using default value: Warning");
+            _PDConfig.logLevel = LOG_WARN;
+        }
+    }
 
-	if (_PDConfig.tcpPort == 0)
-	{
-		if(!config_lookup_int(&_Cfg, "PORT", &_PDConfig.tcpPort))
-		{
-		    LOG(LOG_ERR, "Config file does not contain PORT property, using default: %d", CONFIG_DEFUALT_TCP_PORT);
-		    _PDConfig.tcpPort = CONFIG_DEFUALT_TCP_PORT;
-		    return false;
-		}
-	}
+    if (_PDConfig.tcpPort == 0)
+    {
+        if(!config_lookup_int(&_Cfg, "PORT", &_PDConfig.tcpPort))
+        {
+            LOG(LOG_ERR, "Config file does not contain PORT property, using default: %d", CONFIG_DEFUALT_TCP_PORT);
+            _PDConfig.tcpPort = CONFIG_DEFUALT_TCP_PORT;
+            return false;
+        }
+    }
 
     if (_PDConfig.localProvisionControl == false)
     {
@@ -535,7 +536,7 @@ static bool ReadConfigFile(const char *filePath) {
     return true;
 }
 
-static void Daemonise()
+static void Daemonise(void)
 {
     pid_t pid;
 
@@ -566,16 +567,15 @@ static int ParseCommandArgs(int argc, char *argv[], const char **fptr)
 {
     int opt, tmp;
     opterr = 0;
-	bool isConfigFileSpecified = false;
+    bool isConfigFileSpecified = false;
     char *configFilePath = NULL;
 
     while (1)
     {
-    	opt = getopt(argc, argv, "v:c:l:dr");
-		if (opt == -1)
-		{
+        opt = getopt(argc, argv, "v:c:l:dr");
+        if (opt == -1)
             break;
-		}
+
         switch (opt)
         {
             case 'v':
@@ -591,53 +591,51 @@ static int ParseCommandArgs(int argc, char *argv[], const char **fptr)
                 }
                 break;
 
-			case 'c':
-	            configFilePath = malloc(strlen(optarg));
-	            sprintf(configFilePath, "%s", optarg);
-	            break;
+            case 'c':
+                configFilePath = malloc(strlen(optarg));
+                sprintf(configFilePath, "%s", optarg);
+                break;
 
-			case 'l':
+            case 'l':
                 *fptr = optarg;
                 break;
 
-			case 'd':
-			    Daemonise();
-			    break;
+            case 'd':
+                Daemonise();
+                break;
 
-			case 'r':
-			    _PDConfig.remoteProvisionControl = true;
-			    break;
+            case 'r':
+                _PDConfig.remoteProvisionControl = true;
+                break;
 
             default:
                 return -1;
         }
     }
 
-	if (configFilePath == NULL) {
+    if (configFilePath == NULL)
+    {
         configFilePath = malloc(strlen(DEFAULT_PATH_CONFIG_FILE));
         sprintf(configFilePath, "%s", DEFAULT_PATH_CONFIG_FILE);
     }
 
-	if (ReadConfigFile(configFilePath) == false)
-    {
+    if (ReadConfigFile(configFilePath) == false)
         return -1;
-    }
 
     if (configFilePath != NULL)
-    {
         free(configFilePath);
-    }
 
     return 1;
 }
 
-void CleanupOnExit() {
+void CleanupOnExit(void)
+{
     ubusagent_Close();
     bi_releaseConst();
     queue_Stop();
-    if (_PDConfig.localProvisionControl) {
+    if (_PDConfig.localProvisionControl)
         switch_release();
-    }
+
     config_destroy(&_Cfg);
     sem_destroy(&semaphore);
     sem_destroy(&debugSemapthore);
@@ -647,112 +645,104 @@ void CleanupOnExit() {
 int main(int argc, char **argv)
 {
     sem_init(&debugSemapthore, 0, 1);
-	int ret;
-	const char *fptr = NULL;
-	FILE *logFile;
-	if ((ret = ParseCommandArgs(argc, argv, &fptr)) < 0)
-	{
-		LOG(LOG_ERR, "Invalid command args");
-		return -1;
-	}
+    int ret;
+    const char *fptr = NULL;
+    FILE *logFile;
+    if ((ret = ParseCommandArgs(argc, argv, &fptr)) < 0)
+    {
+        LOG(LOG_ERR, "Invalid command args");
+        return -1;
+    }
 
-	if (fptr)
+    if (fptr)
     {
         logFile = fopen(fptr, "w");
 
         if (logFile != NULL)
-        {
             g_debugStream  = logFile;
-        }
         else
-        {
             LOG(LOG_ERR, "Failed to create or open %s file", fptr);
-        }
     }
 
-	g_debugLevel = _PDConfig.logLevel;
+    g_debugLevel = _PDConfig.logLevel;
 
-	bi_generateConst();
+    bi_generateConst();
 
-	signal(SIGINT, CtrlCHandler);
-	sem_init(&semaphore, 0, 1);
-	history_init();
+    signal(SIGINT, CtrlCHandler);
+    sem_init(&semaphore, 0, 1);
+    history_init();
 
-	if (_PDConfig.localProvisionControl) {
-	    LOG(LOG_INFO, "Enabling button controls.");
-	    int result = switch_init();
-	    result += switch_add_callback(0x02, Switch1PressedCallback);
-	    result += switch_add_callback(0x04, Switch2PressedCallback);
-	    if (result != 0) {
-	        LOG(LOG_ERR, "Problems while acquiring buttons, local provision control might not work.");
-	    }
-	}
+    if (_PDConfig.localProvisionControl)
+    {
+        LOG(LOG_INFO, "Enabling button controls.");
+        int result = switch_init();
+        result += switch_add_callback(0x02, Switch1PressedCallback);
+        result += switch_add_callback(0x04, Switch2PressedCallback);
+        if (result != 0)
+            LOG(LOG_ERR, "Problems while acquiring buttons, local provision control might not work.");
+    }
 
-	clicker_InitSemaphore();
+    clicker_InitSemaphore();
 
-	if (ubusagent_Init() == false) {
+    if (ubusagent_Init() == false)
+    {
         LOG(LOG_ERR, "Unable to register to uBus!");
         CleanupOnExit();
         return -1;
     }
-	if (_PDConfig.remoteProvisionControl) {
-	    LOG(LOG_INFO, "Enabling provision control through uBus.");
-	    if (ubusagent_EnableRemoteControl() == false) {
+    if (_PDConfig.remoteProvisionControl)
+    {
+        LOG(LOG_INFO, "Enabling provision control through uBus.");
+        if (ubusagent_EnableRemoteControl() == false)
             LOG(LOG_ERR, "Problems with uBus, remote control is disabled!");
-        }
-	}
-	con_BindAndListen(_PDConfig.tcpPort, CommandHandler, ClickerConnectionHandler, ClickerDisconnectionHandler);
-	queue_Start();
-	LOG(LOG_INFO, "Entering main loop");
-	while(_KeepRunning)
-	{
+    }
+    con_BindAndListen(_PDConfig.tcpPort, CommandHandler, ClickerConnectionHandler, ClickerDisconnectionHandler);
+    queue_Start();
+    LOG(LOG_INFO, "Entering main loop");
+    while(_KeepRunning)
+    {
         long long int loopStartTime = GetCurrentTimeMillis();
 
-		con_ProcessConnections();
+        con_ProcessConnections();
 
-		UpdateSelectedClicker();
+        UpdateSelectedClicker();
 
-		// Handle buttons press
-		if (_PDConfig.localProvisionControl) {
+        // Handle buttons press
+        if (_PDConfig.localProvisionControl)
+        {
             if (_Switch1Pressed)
-            {
                 HandleButton1Press();
-            }
+
             if (_Switch2Pressed)
-            {
                 HandleButton2Press();
-            }
-		}
+        }
 
 
         if (_ModeChanged)
-        {
             HandleModeChanged();
+
+        UpdateLeds();
+
+        if (_SelectedClickerChanged)
+        {
+            LOG(LOG_INFO, "Selected Clicker ID : %d", _SelectedClicker->clickerID);
+
+            // Send ENABLE_HIGHLIGHT command to active clicker and DISABLE_HIGHLIGHT to inactive clickers
+            con_SendCommand(_SelectedClicker, NetworkCommand_ENABLE_HIGHLIGHT);
+            Clicker * clicker = clicker_GetClickers();
+            while (clicker != NULL)
+            {
+                if (clicker != _SelectedClicker)
+                    con_SendCommand(clicker, NetworkCommand_DISABLE_HIGHLIGHT);
+
+                clicker = clicker->next;
+            }
+            _SelectedClickerChanged = 0;
+            _Mode = pd_Mode_LISTENING;
         }
 
-		UpdateLeds();
-
-		if (_SelectedClickerChanged)
-		{
-			LOG(LOG_INFO, "Selected Clicker ID : %d", _SelectedClicker->clickerID);
-
-			// Send ENABLE_HIGHLIGHT command to active clicker and DISABLE_HIGHLIGHT to inactive clickers
-			con_SendCommand(_SelectedClicker, NetworkCommand_ENABLE_HIGHLIGHT);
-			Clicker * clicker = clicker_GetClickers();
-			while (clicker != NULL)
-			{
-				if (clicker != _SelectedClicker)
-				{
-					con_SendCommand(clicker, NetworkCommand_DISABLE_HIGHLIGHT);
-				}
-				clicker = clicker->next;
-			}
-			_SelectedClickerChanged = 0;
-			_Mode = pd_Mode_LISTENING;
-		}
-
-		Clicker *clk = clicker_GetClickers();
-		while (clk != NULL)
+        Clicker *clk = clicker_GetClickers();
+        while (clk != NULL)
         {
             queue_Task *nextTask = clicker_sm_GetNextTask(clk);
             if (nextTask != NULL)
@@ -760,18 +750,17 @@ int main(int argc, char **argv)
                 queue_AddTask(nextTask);
                 clk->taskInProgress = true;
             }
-			clk = clk->next;
+            clk = clk->next;
 
         }
 
-		queue_Task *lastResult = queue_PopResult();
+        queue_Task *lastResult = queue_PopResult();
 
-		if (lastResult != NULL)
-		{
+        if (lastResult != NULL)
+        {
+            Clicker *clicker = clicker_GetClickerByID(lastResult->clickerID);
 
-			Clicker *clicker = clicker_GetClickerByID(lastResult->clickerID);
-
-			if (clicker != NULL)
+            if (clicker != NULL)
             {
                 switch (lastResult->type)
                 {
@@ -789,14 +778,14 @@ int main(int argc, char **argv)
                         TryToSendPsk(clicker);
                         break;
                     case queue_TaskType_GENERATE_PSK:
-						if (lastResult->outData <= 0)
-						{
-							LOG(LOG_WARN, "Couldn't get PSK from Device Server");
-							clicker->error = pd_Error_GENERATE_PSK;
-							_Mode = pd_Mode_ERROR;
-							clicker->provisioningInProgress = false;
-							break;
-						}
+                        if (lastResult->outData <= 0)
+                        {
+                            LOG(LOG_WARN, "Couldn't get PSK from Device Server");
+                            clicker->error = pd_Error_GENERATE_PSK;
+                            _Mode = pd_Mode_ERROR;
+                            clicker->provisioningInProgress = false;
+                            break;
+                        }
                         LOG(LOG_INFO, "Received PSK from Device Server: %s, dataLen:%d", (char*)lastResult->outData,
                                 lastResult->outDataLength);
 
@@ -814,48 +803,43 @@ int main(int argc, char **argv)
             FREE_AND_NULL(lastResult);
         }
 
-		clicker_Purge();
+        clicker_Purge();
+
+        // disconnect clickers with errors
+        // Clicker *clicker = clicker_GetClickers();
+        // while (clicker != NULL)
+        // {
+        //     if (clicker->error > 0)
+        //     {
+        //         _Mode = pd_Mode_ERROR;
+        //         _ModeErrorTime = GetCurrentTimeMillis();
+        //         LOG(LOG_INFO, "Disconnecting clicker with id : %d due to error : %d", clicker->clickerID, clicker->error);
+        //         con_Disconnect(clicker);
+        //         _ModeChanged = 1;
+        //     }
+        //     clicker = clicker->next;
+        // }
 
 
+        if (_Mode == pd_Mode_ERROR && loopStartTime - _ModeErrorTime > 5000)
+        {
+            _Mode = pd_Mode_LISTENING;
+            _ModeChanged = 1;
+        }
 
-		// disconnect clickers with errors
-		// Clicker *clicker = clicker_GetClickers();
-		// while (clicker != NULL)
-		// {
-		// 	if (clicker->error > 0)
-		// 	{
-		// 		_Mode = pd_Mode_ERROR;
-		// 		_ModeErrorTime = GetCurrentTimeMillis();
-		// 		LOG(LOG_INFO, "Disconnecting clicker with id : %d due to error : %d", clicker->clickerID, clicker->error);
-		// 		con_Disconnect(clicker);
-		// 		_ModeChanged = 1;
-		// 	}
-		// 	clicker = clicker->next;
-		// }
-
-
-		if (_Mode == pd_Mode_ERROR && loopStartTime - _ModeErrorTime > 5000)
-		{
-			_Mode = pd_Mode_LISTENING;
-			_ModeChanged = 1;
-		}
-
-		// disconnect already provisioned clicker after 3s timeout, timeout is important as if we disconnect clicker to early it may try to reconnect
+        // disconnect already provisioned clicker after 3s timeout, timeout is important as if we disconnect clicker to early it may try to reconnect
         if (_SelectedClicker != NULL && _SelectedClicker->provisionTime > 0)
         {
             if (loopStartTime - _SelectedClicker->provisionTime > 3000)
-            {
                 con_Disconnect(_SelectedClicker);
-            }
         }
 
         long long int loopEndTime = GetCurrentTimeMillis();
         if (loopEndTime - loopStartTime < 50)
             usleep(1000*(50-(loopEndTime-loopStartTime)));
+    }
 
-	}
+    CleanupOnExit();
 
-	CleanupOnExit();
-
-	return 0;
+    return 0;
 }

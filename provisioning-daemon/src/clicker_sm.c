@@ -35,54 +35,49 @@
 
 queue_Task * clicker_sm_GetNextTask(Clicker *clicker)
 {
-
-	if (clicker == NULL)
-	{
+    if (clicker == NULL)
+    {
         LOG(LOG_WARN, "clicker_sm_GetNextTask: Passed clicker is NULL");
         return NULL;
-	}
-	if (clicker->taskInProgress)
-	{
-		return NULL;
-	}
+    }
+    if (clicker->taskInProgress)
+        return NULL;
 
-	if (clicker->localKey == NULL)
-	{
-		return queue_NewQueueTask
-		(
-			queue_TaskType_GENERATE_ALICE_KEY,
-			clicker->clickerID,
-			NULL,
-			0,
-			clicker->semaphore
-		);
-	}
+    if (clicker->localKey == NULL)
+    {
+        return queue_NewQueueTask
+        (
+            queue_TaskType_GENERATE_ALICE_KEY,
+            clicker->clickerID,
+            NULL,
+            0,
+            clicker->semaphore
+        );
+    }
 
+    if (clicker->localKey != NULL && clicker->remoteKey != NULL && clicker->sharedKey == NULL && clicker->provisioningInProgress)
+    {
+        return queue_NewQueueTask
+        (
+            queue_TaskType_GENERATE_SHARED_KEY,
+            clicker->clickerID,
+            NULL,
+            0,
+            clicker->semaphore
+        );
+    }
 
-	if (clicker->localKey != NULL && clicker->remoteKey != NULL && clicker->sharedKey == NULL && clicker->provisioningInProgress)
-	{
-		return queue_NewQueueTask
-		(
-			queue_TaskType_GENERATE_SHARED_KEY,
-			clicker->clickerID,
-			NULL,
-			0,
-			clicker->semaphore
-		);
-	}
+    if (clicker->psk == NULL && clicker->provisioningInProgress)
+    {
+        return queue_NewQueueTask
+        (
+            queue_TaskType_GENERATE_PSK,
+            clicker->clickerID,
+            NULL,
+            0,
+            clicker->semaphore
+        );
+    }
 
-	if (clicker->psk == NULL && clicker->provisioningInProgress)
-	{
-		return queue_NewQueueTask
-		(
-			queue_TaskType_GENERATE_PSK,
-			clicker->clickerID,
-			NULL,
-			0,
-			clicker->semaphore
-		);
-	}
-
-	//LOG(LOG_INFO, "GetNExtTaskEnd");
-	return NULL;
+    return NULL;
 }

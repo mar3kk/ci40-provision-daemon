@@ -68,19 +68,19 @@ int g_pd_ConnectedClickers = 0;
 
 static void HandleDisconnect(Clicker *clicker)
 {
-	int socket = clicker->socket;
+    int socket = clicker->socket;
     getpeername(socket , (struct sockaddr*)&_Address , (socklen_t*)&_Addrlen);
-	inet_ntop(AF_INET6, &(_Address).sin6_addr, _Inet6AddrBuffer, INET6_ADDRSTRLEN);
+    inet_ntop(AF_INET6, &(_Address).sin6_addr, _Inet6AddrBuffer, INET6_ADDRSTRLEN);
     LOG(LOG_INFO, "Clicker disconnected, id : %d , ip %s , port %d \n" , clicker->clickerID, _Inet6AddrBuffer , ntohs(_Address.sin6_port));
     close( socket );
-	_ClickerDisconnectedCallback(clicker);
-	clicker_Release(clicker);
-	g_pd_ConnectedClickers--;
+    _ClickerDisconnectedCallback(clicker);
+    clicker_Release(clicker);
+    g_pd_ConnectedClickers--;
 }
 
 static void AcceptConnection(struct sockaddr_in6 *address)
 {
-	int newSocket = 0;
+    int newSocket = 0;
 
     if ((newSocket = accept(_MasterSocket, (struct sockaddr *)address, (socklen_t*)&_Addrlen))<0)
     {
@@ -88,56 +88,53 @@ static void AcceptConnection(struct sockaddr_in6 *address)
         return;
     }
     getpeername(newSocket , (struct sockaddr*)&_Address , (socklen_t*)&_Addrlen);
-	inet_ntop(AF_INET6, &(*address).sin6_addr, _Inet6AddrBuffer, INET6_ADDRSTRLEN);
+    inet_ntop(AF_INET6, &(*address).sin6_addr, _Inet6AddrBuffer, INET6_ADDRSTRLEN);
 
-	Clicker *newClicker = clicker_New(newSocket);
+    Clicker *newClicker = clicker_New(newSocket);
 
     LOG(LOG_INFO, "New clicker connected, id : %d, socket fd : %d, ip : %s, port : %d \n",
         newClicker->clickerID, newSocket, _Inet6AddrBuffer, ntohs((*address).sin6_port));
-	_ClickerConnectedCallback(newClicker, _Inet6AddrBuffer);
+    _ClickerConnectedCallback(newClicker, _Inet6AddrBuffer);
 
-	g_pd_ConnectedClickers++;
+    g_pd_ConnectedClickers++;
 }
 
 static int HandleRead(struct sockaddr_in6 *address)
 {
-
-	int sd = 0;
-	size_t valread = 0;
-	Clicker *clicker = clicker_GetClickers();
-	while (clicker != NULL)
+    int sd = 0;
+    size_t valread = 0;
+    Clicker *clicker = clicker_GetClickers();
+    while (clicker != NULL)
     {
         sd = clicker->socket;;
         if (FD_ISSET(sd, &_Readfs))
         {
             if ((valread = read(sd, _Buffer, 1024)) == 0)
             {
-				LOG(LOG_DBG, "Read error. Disconnecting");
-            	HandleDisconnect(clicker);
-            	return 0;
+                LOG(LOG_DBG, "Read error. Disconnecting");
+                HandleDisconnect(clicker);
+                return 0;
             }
             else
             {
-				_CommandCallback(clicker, _Buffer);
+                _CommandCallback(clicker, _Buffer);
                 return 1;
             }
         }
-		clicker = clicker->next;
+        clicker = clicker->next;
     }
     return 0;
 }
 
-
-
 int con_BindAndListen(
-	int tcpPort,
-	pd_CommandCallback commandCallback,
-	pd_ClickerConnectedCallback clickerConnectedCallback,
-	pd_ClickerDisconnectedCallback clickerDisconnectedCallback)
+    int tcpPort,
+    pd_CommandCallback commandCallback,
+    pd_ClickerConnectedCallback clickerConnectedCallback,
+    pd_ClickerDisconnectedCallback clickerDisconnectedCallback)
 {
-	_CommandCallback = commandCallback;
-	_ClickerConnectedCallback = clickerConnectedCallback;
-	_ClickerDisconnectedCallback = clickerDisconnectedCallback;
+    _CommandCallback = commandCallback;
+    _ClickerConnectedCallback = clickerConnectedCallback;
+    _ClickerDisconnectedCallback = clickerDisconnectedCallback;
 
     int reuse_addr = 1;
 
@@ -170,83 +167,74 @@ int con_BindAndListen(
     }
 
     listen(_MasterSocket, 5);
-	return 0;
+    return 0;
 }
 
-static void CheckConnections()
+static void CheckConnections(void)
 {
     long currentTimeMillis = GetCurrentTimeMillis();
-	Clicker *clicker = clicker_GetClickers();
+    Clicker *clicker = clicker_GetClickers();
 
     while(clicker != NULL)
     {
-		if (currentTimeMillis - clicker->lastKeepAliveTime > KEEP_ALIVE_TIMEOUT_MS)
-		{
-			HandleDisconnect(clicker);
-		}
-		clicker = clicker->next;
+        if (currentTimeMillis - clicker->lastKeepAliveTime > KEEP_ALIVE_TIMEOUT_MS)
+            HandleDisconnect(clicker);
+
+        clicker = clicker->next;
     }
 }
 
-void con_ProcessConnections()
+void con_ProcessConnections(void)
 {
-	int i = 0;
-	int activity, sd;
-	FD_ZERO(&_Readfs);
+    int i = 0;
+    int activity, sd;
+    FD_ZERO(&_Readfs);
     FD_SET(_MasterSocket, &_Readfs);
     _MaxSD = _MasterSocket;
 
-	Clicker *ptr = clicker_GetClickers();
+    Clicker *ptr = clicker_GetClickers();
 
-   	while(ptr != NULL)
-	{
-		sd = ptr->socket;
-		if (sd > 0)
+    while(ptr != NULL)
+    {
+        sd = ptr->socket;
+        if (sd > 0)
            FD_SET(sd, &_Readfs);
         if (sd > _MaxSD)
             _MaxSD = sd;
-		ptr = ptr->next;
-   	}
+        ptr = ptr->next;
+   }
 
     activity = select(_MaxSD + 1, &_Readfs, NULL, NULL, &_SelectTimeout);
 
     if (activity < 0)
     {
         LOG(LOG_ERR, "select error. Errno: %d", errno);
-		return;
+        return;
     }
 
-    if (FD_ISSET(_MasterSocket, &_Readfs))
-    {
-        //handle incoming connection
+    if (FD_ISSET(_MasterSocket, &_Readfs))  //handle incoming connection
         AcceptConnection(&_Address);
-    }
-    else
-    {
-        //handle read
+    else                                    //handle read
         HandleRead(&_Address);
-    }
 
-	unsigned long currentTimeMillis = GetCurrentTimeMillis();
-	if (currentTimeMillis - _LastKeepAliveSendTime > KEEP_ALIVE_INTERVAL_MS)
+    unsigned long currentTimeMillis = GetCurrentTimeMillis();
+    if (currentTimeMillis - _LastKeepAliveSendTime > KEEP_ALIVE_INTERVAL_MS)
     {
-
         _LastKeepAliveSendTime = currentTimeMillis;
-		Clicker *ptr = clicker_GetClickers();
+        Clicker *ptr = clicker_GetClickers();
 
-    	while(ptr != NULL)
-		{
-			con_SendCommand(ptr, NetworkCommand_KEEP_ALIVE);
-			ptr = ptr->next;
-    	}
+        while(ptr != NULL)
+        {
+            con_SendCommand(ptr, NetworkCommand_KEEP_ALIVE);
+            ptr = ptr->next;
+        }
     }
 
-	if (currentTimeMillis - _LastCheckConnectionsTime > CHECK_CONNECTIONS_INTERVAL_MS)
-	{
-
-		_LastCheckConnectionsTime = currentTimeMillis;
-		CheckConnections();
-	}
+    if (currentTimeMillis - _LastCheckConnectionsTime > CHECK_CONNECTIONS_INTERVAL_MS)
+    {
+        _LastCheckConnectionsTime = currentTimeMillis;
+        CheckConnections();
+    }
 }
 
 
@@ -258,12 +246,12 @@ void con_SendCommand(Clicker* clicker, NetworkCommand command)
 
 void con_SendCommandWithData(Clicker *clicker, NetworkCommand command, uint8_t *data, uint8_t dataLength)
 {
-	uint8_t buffer[dataLength+2];
+    uint8_t buffer[dataLength+2];
 
-	buffer[0] = command;
-	buffer[1] = dataLength;
-	memcpy(&buffer[2], data, dataLength);
-	send(clicker->socket, buffer, dataLength+2, 0);
+    buffer[0] = command;
+    buffer[1] = dataLength;
+    memcpy(&buffer[2], data, dataLength);
+    send(clicker->socket, buffer, dataLength+2, 0);
 }
 
 void con_Disconnect(Clicker *clicker)

@@ -38,7 +38,7 @@ typedef struct
 bool ubusagent_Init(void);
 void ubusagent_Close(void);
 
-bool ubusagent_EnableRemoteControl();
+bool ubusagent_EnableRemoteControl(void);
 
 /**
  * @brief Send "generatePsk" call to "imgtec" object through ubus.

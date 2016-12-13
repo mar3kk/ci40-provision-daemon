@@ -57,6 +57,8 @@ bool GenerateRandomX(unsigned char* array, int length);
 
 void GenerateClickerNameHash(char *buffer);
 
+void GenerateClickerTimeHash(char *buffer);
+
 void GenerateClickerName(char* outBuffer, int maxBufLen, char *pattern, char *hash, char *ip);
 
 #endif /* utils_h */
