@@ -8,9 +8,10 @@ before_install:
   - sudo apt-get -qq update
   - sudo apt-get install -y gnupg git-core build-essential libssl-dev libncurses5-dev unzip gawk subversion mercurial
 script:
+
   - export CI40_FILE_URL="$CI40_SDK_URL$CI40_SDK.tar.bz2"
   - cd $HOME/build && wget $CI40_FILE_URL && tar xfj $CI40_SDK.tar.bz2
   - cd $CI40_SDK && ./scripts/feeds update -a && ./scripts/feeds install -a
-  - echo -e "CONFIG_DEVEL=y\nCONFIG_SRC_TREE_OVERRIDE=y" >> .config
-  - ln -s $TRAVIS_BUILD_DIR/.git feeds/creatordev/provisioning-daemon/git-src
-  - make package/provisioning-daemon/compile -j1 V=s
+  - sed -i '/^PKG_SOURCE/ d' feeds/creatordev/provisioning-daemon/Makefile
+  - make package/provisioning-daemon/prepare USE_SOURCE_DIR=$TRAVIS_BUILD_DIR V=s
+  - make package/provisioning-daemon/compile V=s
