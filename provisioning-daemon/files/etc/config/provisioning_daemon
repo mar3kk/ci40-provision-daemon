@@ -1,0 +1,37 @@
+#URI at which Device Server is located.
+BOOTSTRAP_URI="coaps://deviceserver.creatordev.io:15684"
+
+#TCP port on which daemon is awaiting for connections.
+PORT=49300
+
+#Turns on/off possibility to control provision process through uBus commands.
+#Default value is false
+REMOTE_PROVISION_CTRL=false
+
+#Turns on/off possibility to control provision process through buttons on ci40.
+#Default value is true
+LOCAL_PROVISION_CTRL=true
+
+#This is address of default gateway. This value should be passed to method uip_ds6_defrt_add on constrained device, it will be passed to constrained device as one of config parameters.
+#Maximum length 100 characters
+DEFAULT_ROUTE_URI="..."
+
+#This is address of DNS server. This value should be passed to method uip_nameserver_update on constrained device, it will be passed to constrained device as one of config parameters.
+#Maximum length 100 characters
+DNS_SERVER="..."
+
+#This is name which should be used by constrained device. It should be used when initializing Awa client, it will be passed to constrained device as one of config parameters.
+#Maximum length is 24 characters (including generated parts)
+#To add dynamic part of name you can use following arguments:
+# {t} - timestamp in alpha-numeric encoded form
+# {i} - last parts of constrained device ip address
+ENDPOINT_NAME_PATTERN="<static name>{t}{i}"
+
+#Sets logging level of daemon. Following values are valid:
+# 1 - FATAL ERROR
+# 2 - ERROR
+# 3 - WARNING
+# 4 - INFO
+# 5 - DEBUG (VERBOSE)
+#default value is 3
+LOG_LEVEL=3

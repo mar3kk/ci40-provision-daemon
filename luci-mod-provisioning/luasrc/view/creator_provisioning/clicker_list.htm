@@ -1,0 +1,120 @@
+
+
+
+<% if table.getn(clickers["clickers"]) == 0 then %>
+<div class="alert alert-info">
+    No clickers connected to provisioning daemon.
+</div>
+<% end %>
+
+<div class="rounded-container" style="corner-radius:5px;border:1px solid #f0f0f0;">
+    <div class="header" style="background:#f7f7f7;height:75px;">
+        <div class="row">
+            <div class="col-lg-11">
+                <p class="proviosining-header" style="line-height:45px;">Choose a device to provision</p>
+            </div>
+            <div class="col-lg-1">
+
+            </div>
+        </div>
+    </div>
+
+    <% for i = 1, table.getn(clickers["clickers"]) do %>
+    <% local clicker = clickers["clickers"][i]; %>
+    <% if not clicker["isProvisioned"] then %>
+
+    <div class="clicker-row">
+        <div class="row">
+            <div class="col-lg-1" style="height:50px;">
+                <img src="/luci-static/resources/creator/gfx/Clicker_connected.jpg" />
+            </div>
+            <div class="col-lg-5" style="height:50px;">
+                <p class="provision-clicker-name"><%= clicker["name"] %></p>
+            </div>
+            <div class="col-lg-3 text-right" style="height:50px;">
+                <% if clicker["isError"] and not clicker["inProvisionState"] then %>
+                    <p class="provision-error" style="color:red;">PROVISIONING FAILED </p>
+                <% end %>
+            </div>
+            <div class="col-lg-1" style="height:50px;">
+                <% if clicker["selected"] then %>
+                <a href="" style="display:block; margin-top:13px;"><img src="/luci-static/resources/creator/gfx/ic_radio_button_checked_black_24px.svg" /></a>
+                <% else %>
+                <a href="#" onclick="selectClicker(<%= clicker["id"]%>);return;" style="display:block; margin-top:13px;"><img src="/luci-static/resources/creator/gfx/ic_radio_button_unchecked_black_24px.svg" /></a>
+                <% end %>
+            </div>
+            <div class="col-lg-2" style="height:50px;">
+                <% if clicker["inProvisionState"] then %>
+                <div style="width:140px;">
+                    <img src="/luci-static/resources/creator/gfx/ic-loading.svg" style="margin-top:13px;float:left;display:block;"/>
+                    <p style="float:left;font-size:11px;">PROVISIONING</p>
+                </div>
+                <% elseif clicker["selected"] and not clicker["isError"] then %>
+                <a class="btn-creator provision-button" style="width:120px; margin:7px 0px 0px 0px !important;" onclick="startProvisioning(<%= clicker["id"]%>);return;">PROVISION</a>
+                <% elseif clicker["selected"] and clicker["isError"] then %>
+                <a class="btn-creator provision-button" style="width:120px; margin:7px 0px 0px 0px !important;text-align:center;" onclick="startProvisioning(<%= clicker["id"]%>);return;">RETRY</a>
+                <% else %>
+                <a class="btn-creator provision-button disabled" style="width:120px; margin:7px 0px 0px 0px !important;">PROVISION</a>
+                <% end %>
+            </div>
+        </div>
+        <% if #clickers["clickers"] > i then %>
+
+        <% end %>
+    </div>
+
+    <% end %>
+
+
+    <% end %>
+</div>
+
+<br /><br />
+
+<div class="rounded-container" style="corner-radius:5px;border:1px solid #f0f0f0;">
+    <div class="header" style="background:#f7f7f7;height:75px;">
+        <div class="row">
+            <div class="col-lg-11">
+                <p class="proviosining-header" style="line-height:45px;">Provisioned devices</p>
+            </div>
+            <div class="col-lg-1">
+
+            </div>
+        </div>
+    </div>
+
+    <% for i = 1, table.getn(clickers["clickers"]) do %>
+    <% local clicker = clickers["clickers"][i]; %>
+
+    <% if clicker["isProvisioned"] then %>
+    <div class="clicker-row">
+        <div class="row">
+            <div class="col-lg-1" style="height:50px;">
+                <img src="/luci-static/resources/creator/gfx/Clicker_connected.jpg" />
+            </div>
+            <div class="col-lg-8" style="height:50px;">
+                <p class="provision-clicker-name"><%= clicker["name"] %></p>
+            </div>
+
+            <div class="col-lg-3 text-right" style="height:50px;">
+                <div style="float:right">
+                    <img src="/luci-static/resources/creator/gfx/connected.svg" style="float:left;display:block;margin-top:13px;"/>
+                    <p class="connected" style="float:left;color:#299830;">CONNECTED</p>
+                </div>
+            </div>
+        </div>
+        <% if #clickers["clickers"] > i then %>
+
+        <% end %>
+    </div>
+
+    <% end %>
+
+
+    <% end %>
+</div>
+
+<br /><br />
+
+
+</div>

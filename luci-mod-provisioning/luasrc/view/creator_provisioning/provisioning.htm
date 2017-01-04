@@ -1,0 +1,156 @@
+<%+header%>
+<%+creator_onboarding/creator_include%>
+<link rel="stylesheet" href="/luci-static/resources/creator/css/provisioning.css">
+<div class="bootstrap-isolation">
+
+<div class="row" style="margin-top:20px;margin-bottom:30px;">
+    <div class="col-lg-8">
+        <h3 style="margin:0px;">Provisioning</h3>
+    </div>
+    <div class="col-lg-3 text-right">
+        <p style="color:$787878;margin:0px;">PROVISIONING DAEMON</p>
+    </div>
+    <div class="col-lg-1 text-right">
+        <% local checked = "checked" %>
+        <% if not isProvisioningDaemonRunning then %>
+        <% checked = "" %>
+        <% end %>
+        <input type="checkbox" id="unchecked" class="cbx hidden" <%=checked %> onclick="startStopDaemon();return;"/>
+        <label for="unchecked" class="lbl"></label>
+
+    </div>
+</div>
+<br />
+
+<% if not isBoardProvisioned then %>
+<div class="alert alert-danger">
+    This board hasn't completed onboarding process yet. Please do onboarding first.
+</div>
+<% elseif not isProvisioningDaemonRunning then %>
+<div class="alert alert-danger">
+    Provisioning daemon isn't ranning on this Ci40. Please start it first
+</div>
+<% end %>
+
+<div id="clicker_list">
+</div>
+
+<%+creator_onboarding/loading_modal%>
+<%+creator_onboarding/alert_modal%>
+<div class="modal" tabindex="-1" role="dialog" id="alert-modal">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <!--<div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+        <h4 class="modal-title">Modal title</h4>
+    </div>-->
+      <div class="modal-body">
+        <div class="row">
+            <div class="col-lg-12" id="alert-modal-body">
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-lg-12 text-right">
+                <button type="button" class="btn btn-primary" data-dismiss="modal">Close</button>
+            </div>
+        </div>
+
+      </div>
+
+    </div><!-- /.modal-content -->
+  </div><!-- /.modal-dialog -->
+</div><!-- /.modal -->
+</div>
+
+<%+footer%>
+
+<script>
+function getConnectedClickers(){
+    $.post('provisioning/clicker_list', function(data) {
+        $("#clicker_list").html(data);  // process results here
+
+    });
+}
+<% if (isProvisioningDaemonRunning and isBoardProvisioned) then %>
+getConnectedClickers();
+setInterval("getConnectedClickers()", 2000);
+<% end %>
+
+function startProvisioning(clickerID) {
+    showLoadingModal("Starting provisioning process...");
+    $.post('provisioning/start_provisioning',{clickerID : clickerID}, function(data) {
+
+    })
+    .fail(function(jqXHR, textStatus, errorThrown) {
+        hideLoadingModal();
+        showModalError(errorThrown);
+    })
+    .done(function() {
+        hideLoadingModal();
+        getConnectedClickers();
+    });
+}
+
+function selectClicker(clickerID) {
+    showLoadingModal("Selecting clicker...");
+    $.post('provisioning/select_clicker',{clickerID : clickerID}, function(data) {
+
+    })
+    .fail(function(jqXHR, textStatus, errorThrown) {
+        hideLoadingModal();
+        showModalError(errorThrown);
+    })
+    .done(function() {
+        hideLoadingModal();
+        getConnectedClickers();
+    });
+}
+
+function showModalError(msg) {
+    $("#alert-modal-body").html(msg);
+    $("#alert-modal").modal('show');
+}
+
+function startDaemon() {
+    $.post('provisioning/start_daemon', function(data) {
+
+    })
+    .fail(function(jqXHR, textStatus, errorThrown) {
+        showModalError(errorThrown);
+    })
+    .done(function() {
+        location.reload();
+    });
+}
+
+function stopDaemon() {
+    $.post('provisioning/stop_daemon', function(data) {
+
+    })
+    .fail(function(jqXHR, textStatus, errorThrown) {
+        showModalError(errorThrown);
+    })
+    .done(function() {
+        location.reload();
+    });
+}
+
+function startStopDaemon() {
+    showLoadingModal("Starting / stopping provisioning daemon");
+    $.post('provisioning/start_stop_daemon', function(data) {
+
+    })
+    .fail(function(jqXHR, textStatus, errorThrown) {
+        hideLoadingModal();
+        showModalError(errorThrown);
+    })
+    .done(function() {
+        setTimeout(function() {
+            hideLoadingModal();
+            location.reload();
+        },1000);
+
+    });
+}
+
+</script>
