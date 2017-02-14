@@ -50,7 +50,8 @@ typedef struct __attribute__((__packed__))
     uint8_t securityMode;
     uint8_t pskKeySize;
     uint8_t psk[32];
-    uint8_t bootstrapUri[200];
+    uint8_t identity[50];
+    uint8_t bootstrapUri[150];
 } pd_DeviceServerConfig;
 
 typedef struct __attribute__((__packed__))

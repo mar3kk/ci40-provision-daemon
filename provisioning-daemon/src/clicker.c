@@ -58,6 +58,7 @@ static void Destroy(Clicker *clicker)
     FREE_AND_NULL(clicker->localKey);
     FREE_AND_NULL(clicker->remoteKey);
     FREE_AND_NULL(clicker->sharedKey);
+    FREE_AND_NULL(clicker->identity);
     FREE_AND_NULL(clicker->psk);
     FREE_AND_NULL(clicker->name);
     FREE_AND_NULL(clicker);
@@ -154,6 +155,7 @@ Clicker *clicker_New(int socket)
     newClicker->localKey = NULL;
     newClicker->remoteKey = NULL;
     newClicker->sharedKey = NULL;
+    newClicker->identity = NULL;
     newClicker->psk = NULL;
     newClicker->ownershipsCount = 0;
     newClicker->provisionTime = 0;
