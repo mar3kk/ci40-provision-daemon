@@ -66,6 +66,16 @@ typedef struct queue_Task
 } queue_Task;
 
 /**
+ * @brief this struct is returned in queue_TaskType_GENERATE_PSK outData.
+ */
+typedef struct {
+  char psk[255];
+  uint8_t pskLen;
+  char identity[64];
+  uint8_t identityLen;
+} queue_pskIdentityPair;
+
+/**
  * @brief Add new task to queue.
  * @param[in] task that will be added to queue
  */

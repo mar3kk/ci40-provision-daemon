@@ -420,8 +420,12 @@ void TryToSendPsk(Clicker *clicker)
     {
         memset(&_DeviceServerConfig, 0, sizeof(_DeviceServerConfig));
         _DeviceServerConfig.securityMode = 0;
+
         memcpy(_DeviceServerConfig.psk, clicker->psk, P_MODULE_LENGTH);
         _DeviceServerConfig.pskKeySize = P_MODULE_LENGTH;
+
+        memcpy(_DeviceServerConfig.identity, clicker->identity, clicker->identityLen);
+        _DeviceServerConfig.identity = clicker->identityLen;
 
         memcpy(_DeviceServerConfig.bootstrapUri, _PDConfig.bootstrapUri, strnlen(_PDConfig.bootstrapUri, 200));
         uint8_t dataLen = 0;
@@ -789,8 +793,15 @@ int main(int argc, char **argv)
                         LOG(LOG_INFO, "Received PSK from Device Server: %s, dataLen:%d", (char*)lastResult->outData,
                                 lastResult->outDataLength);
 
-                        clicker->psk = malloc(lastResult->outDataLength/2);
-                        HexStringToByteArray(lastResult->outData, clicker->psk, lastResult->outDataLength/2);
+                        {
+                          queue_pskIdentityPair* pair = (queue_pskIdentityPair*)lastResult->outData;
+                          clicker->psk = malloc(pair->pskLen/2);
+                          HexStringToByteArray(pair->psk, clicker->psk, pair->pskLen/2);
+                          clicker->identity = malloc(pair->identityLen + 1);
+                          strncpy(clicker->identity, pair->identity, pair->identityLen);
+                          clicker->identityLen = pair->identityLen;
+                        }
+
                         TryToSendPsk(clicker);
                         FREE_AND_NULL(lastResult->outData);
                         history_AddAsProvisioned(clicker->clickerID, clicker->name);
