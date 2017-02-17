@@ -36,6 +36,7 @@
 #define __PROCESSING_QUEUE_H__
 #include <stdint.h>
 #include <semaphore.h>
+#include <stddef.h>
 
 /**
  * Represents available task types that can be added to queue
@@ -72,7 +73,7 @@ typedef struct {
   char psk[255];
   uint8_t pskLen;
   char identity[64];
-  uint8_t identityLen;
+  size_t identityLen;
 } queue_pskIdentityPair;
 
 /**

@@ -425,7 +425,7 @@ void TryToSendPsk(Clicker *clicker)
         _DeviceServerConfig.pskKeySize = P_MODULE_LENGTH;
 
         memcpy(_DeviceServerConfig.identity, clicker->identity, clicker->identityLen);
-        _DeviceServerConfig.identity = clicker->identityLen;
+        _DeviceServerConfig.identitySize = clicker->identityLen;
 
         memcpy(_DeviceServerConfig.bootstrapUri, _PDConfig.bootstrapUri, strnlen(_PDConfig.bootstrapUri, 200));
         uint8_t dataLen = 0;
