@@ -156,6 +156,7 @@ Clicker *clicker_New(int socket)
     newClicker->remoteKey = NULL;
     newClicker->sharedKey = NULL;
     newClicker->psk = NULL;
+    newClicker->pskLen = 0;
     newClicker->identity = NULL;
     newClicker->ownershipsCount = 0;
     newClicker->provisionTime = 0;

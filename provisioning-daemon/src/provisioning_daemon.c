@@ -32,35 +32,34 @@
  * Includes
  **************************************************************************************************/
 
-#include "log.h"
-#include "errors.h"
-#include "led.h"
-#include "commands.h"
-#include "connection_manager.h"
-#include "ubus_agent.h"
-#include "processing_queue.h"
+#include <bits/alltypes.h>
+#include <bits/signal.h>
+#include <letmecreate/core/switch.h>
+#include <libconfig.h>
+#include <semaphore.h>
+#include <signal.h>
+#include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
 #include "clicker.h"
 #include "clicker_sm.h"
-#include "utils.h"
+#include "commands.h"
+#include "connection_manager.h"
+#include "crypto/bigint.h"
 #include "crypto/crypto_config.h"
 #include "crypto/diffie_hellman_keys_exchanger.h"
 #include "crypto/encoder.h"
+#include "errors.h"
+#include "led.h"
+#include "log.h"
+#include "processing_queue.h"
 #include "provision_history.h"
-
-#include <letmecreate/core.h>
-#include <libconfig.h>
-#include <stdio.h>
-#include <string.h>
-#include <signal.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <errno.h>
-#include <stdint.h>
-#include <stdbool.h>
-#include <semaphore.h>
+#include "ubus_agent.h"
+#include "utils.h"
 
 /***************************************************************************************************
  * Definitions
@@ -421,8 +420,8 @@ void TryToSendPsk(Clicker *clicker)
         memset(&_DeviceServerConfig, 0, sizeof(_DeviceServerConfig));
         _DeviceServerConfig.securityMode = 0;
 
-        memcpy(_DeviceServerConfig.psk, clicker->psk, P_MODULE_LENGTH);
-        _DeviceServerConfig.pskKeySize = P_MODULE_LENGTH;
+        memcpy(_DeviceServerConfig.psk, clicker->psk, clicker->pskLen);
+        _DeviceServerConfig.pskKeySize = clicker->pskLen;
 
         memcpy(_DeviceServerConfig.identity, clicker->identity, clicker->identityLen);
         _DeviceServerConfig.identitySize = clicker->identityLen;
@@ -797,6 +796,7 @@ int main(int argc, char **argv)
                           queue_pskIdentityPair* pair = (queue_pskIdentityPair*)lastResult->outData;
                           clicker->psk = malloc(pair->pskLen/2);
                           HexStringToByteArray(pair->psk, clicker->psk, pair->pskLen/2);
+                          clicker->pskLen = pair->pskLen/2;
                           clicker->identity = malloc(pair->identityLen + 1);
                           strncpy(clicker->identity, pair->identity, pair->identityLen);
                           clicker->identityLen = pair->identityLen;
