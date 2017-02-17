@@ -36,6 +36,7 @@
 #define __PROCESSING_QUEUE_H__
 #include <stdint.h>
 #include <semaphore.h>
+#include <stddef.h>
 
 /**
  * Represents available task types that can be added to queue
@@ -64,6 +65,16 @@ typedef struct queue_Task
     int statusCode;
     struct queue_Task *next;
 } queue_Task;
+
+/**
+ * @brief this struct is returned in queue_TaskType_GENERATE_PSK outData.
+ */
+typedef struct {
+  char psk[255];
+  uint8_t pskLen;
+  char identity[64];
+  size_t identityLen;
+} queue_pskIdentityPair;
 
 /**
  * @brief Add new task to queue.

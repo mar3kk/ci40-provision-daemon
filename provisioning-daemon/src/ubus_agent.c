@@ -223,7 +223,7 @@ static void GeneratePskResponseHandler(struct ubus_request *req, int type, struc
     if (error)
     {
         LOG(LOG_ERR, "uBusAgent: Error while generating PSK : %s", error);
-        callback(NULL, 0, ((pdubus_GeneratePskRequest*)req->priv));
+        callback(NULL, NULL, ((pdubus_GeneratePskRequest*)req->priv));
         return;
     }
 
@@ -232,11 +232,20 @@ static void GeneratePskResponseHandler(struct ubus_request *req, int type, struc
     if (!psk)
     {
         LOG(LOG_ERR, "uBusAgent: UNKNOWN PSK");
-        callback(NULL, 0, ((pdubus_GeneratePskRequest*)req->priv));
+        callback(NULL, NULL, ((pdubus_GeneratePskRequest*)req->priv));
         return;
     }
-    LOG(LOG_INFO, "uBusAgent: Obtained PSK: %s", psk);
-    callback(psk, strlen(psk), ((pdubus_GeneratePskRequest*)req->priv));
+
+    char *identity = blobmsg_get_string(args[GENERATE_PSK_RESPONSE_PSK_IDENTITY]);
+    if (!identity)
+    {
+        LOG(LOG_ERR, "uBusAgent: UNKNOWN PSK");
+        callback(NULL, NULL, ((pdubus_GeneratePskRequest*)req->priv));
+        return;
+    }
+
+    LOG(LOG_INFO, "uBusAgent: Obtained PSK: %s and IDENTITY: %s", psk, identity);
+    callback(psk, identity, ((pdubus_GeneratePskRequest*)req->priv));
 
     return;
 }

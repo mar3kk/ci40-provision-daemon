@@ -54,12 +54,8 @@ static queue_Task *_Result = NULL;
 static sem_t semaphore;
 static pthread_t _QueueThread;
 static int _KeepRunning = 1;
-static char *_Psk = NULL;
-static uint8_t _PskLen = 0;
 
-
-
-static void GeneratePskCallback(char *psk, uint8_t pskLen, void *arg)
+static void GeneratePskCallback(char *psk, char* identity, void *arg)
 {
     pdubus_GeneratePskRequest *request = (pdubus_GeneratePskRequest*)arg;
     queue_Task *task = request->priv;
@@ -75,15 +71,17 @@ static void GeneratePskCallback(char *psk, uint8_t pskLen, void *arg)
         return;
     }
     sem_wait(&semaphore);
-    _Psk = malloc(pskLen+1);
-    strncpy(_Psk, psk, pskLen+1);
-    _PskLen = pskLen;
-    task->outData = _Psk;
-    task->outDataLength = pskLen+1;
+    queue_pskIdentityPair* pair = malloc(sizeof(queue_pskIdentityPair));
+    pair->pskLen = strlen(psk);
+    strncpy(pair->psk, psk, 255);
+    pair->identityLen = strlen(identity);
+    strncpy(pair->identity, identity, 64);
+
+    task->outData = pair;
+    task->outDataLength = sizeof(queue_pskIdentityPair);
     _Result = task;
     FREE_AND_NULL(request);
     sem_post(&semaphore);
-
 }
 
 void queue_AddTask(queue_Task *task)
@@ -128,7 +126,6 @@ static void queue_HandleGeneratelocalKey(queue_Task *task)
     sem_wait(&semaphore);
     DiffieHellmanKeysExchanger *keysExchanger = clicker->keysExchanger;
     task->outData = (void*)dh_generateExchangeData(keysExchanger);
-
     task->outDataLength = keysExchanger->pModuleLength;
 
     _Result = task;
@@ -138,11 +135,6 @@ static void queue_HandleGeneratelocalKey(queue_Task *task)
 
 static void queue_HandleGeneratePsk(queue_Task *task)
 {
-    unsigned long currentTime = GetCurrentTimeMillis();
-    sem_wait(&semaphore);
-    _Psk = NULL;
-    sem_post(&semaphore);
-
     pdubus_GeneratePskRequest *request;
     request = malloc(sizeof(pdubus_GeneratePskRequest));
     request->callback = GeneratePskCallback;
@@ -156,7 +148,6 @@ static void queue_HandleGeneratePsk(queue_Task *task)
         sem_post(&semaphore);
         FREE_AND_NULL(request);
     }
-
 }
 
 static void queue_HandleGenerateSharedKey(queue_Task *task)

@@ -24,7 +24,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-typedef void (*pdubus_GeneratePskCallback)(char *psk, uint8_t pskLen, void *userData);
+typedef void (*pdubus_GeneratePskCallback)(char *psk, char *identity, void *userData);
 
 typedef struct
 {

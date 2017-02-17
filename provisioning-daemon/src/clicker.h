@@ -55,6 +55,9 @@ typedef struct Clicker
     uint8_t *remoteKey;                    /**< Exchange key received from remote clicker */
     uint8_t *sharedKey;                 /**< shared key used to encrypt communication with remote clicker */
     uint8_t *psk;                       /**< psk received from device server */
+    uint8_t pskLen;                     /**< Length of psk key */
+    uint8_t *identity;                  /**< identity received from device server */
+    size_t identityLen;                /**< Length of identity field */
     bool taskInProgress;
     DiffieHellmanKeysExchanger *keysExchanger; /**< struct used to exchange crypto keys between provisioning daemon and remote clicker */
     sem_t * semaphore;                  /**< semaphore that shpuld be used to synchronize operations on this struct fields */
