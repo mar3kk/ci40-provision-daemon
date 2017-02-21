@@ -187,18 +187,22 @@ static void CtrlCHandler(int signal)
  */
 static void HandleKeepAliveCommand(Clicker *clicker)
 {
+    clicker_wait();
     clicker->lastKeepAliveTime = GetCurrentTimeMillis();
+    clicker_post();
 }
 
 static void HandleKeyCommand(Clicker *clicker, uint8_t *data)
 {
     uint8_t dataLength = data[1];
+    clicker_wait();
     if (clicker->remoteKey != NULL)
         FREE_AND_NULL(clicker->remoteKey);
     clicker->remoteKey = malloc(dataLength);
     memcpy(clicker->remoteKey, &data[2], dataLength);
     LOG(LOG_INFO, "Received exchange key from clicker : %d", clicker->clickerID);
     PRINT_BYTES(clicker->remoteKey, P_MODULE_LENGTH);
+    clicker_post();
 
 }
 
@@ -230,14 +234,20 @@ static void ClickerDisconnectionHandler(Clicker *clicker)
 
 static void ClickerConnectionHandler(Clicker *clicker, char *ip)
 {
+    clicker_wait();
     clicker->keysExchanger = dh_newKeyExchanger(g_KeyBuffer, P_MODULE_LENGTH, CRYPTO_G_MODULE, GenerateRandomX);
+    clicker_post();
+
     char hash[10];
     GenerateClickerTimeHash(hash);
     char ipFragment[5];
     memset(ipFragment, 0, 5);
     strncpy(ipFragment, ip + strlen(ip) - 4, 4);
+    clicker_wait();
     GenerateClickerName(clicker->name, COMMAND_ENDPOINT_NAME_LENGTH, (char*)_PDConfig.endPointNamePattern, hash, ipFragment);
+
     LOG(LOG_INFO, "New clicker connected, ip : %s, id : %d, name : %s", ip, clicker->clickerID, clicker->name);
+    clicker_post();
 }
 
 /**
@@ -308,11 +318,12 @@ static void UpdateSelectedClicker(void)
 static int TryChangeSelectedClicker(void)
 {
     sem_wait(&semaphore);
+    clicker_wait();
     LOG(LOG_DBG, "Try change selected clicker");
     int connectedClickersCount = g_pd_ConnectedClickers;
     if (connectedClickersCount == 0)
     {
-        LOG(LOG_DBG, "End try change selected clicker 1");
+
         sem_post(&semaphore);
         return 0;
     }
@@ -320,13 +331,14 @@ static int TryChangeSelectedClicker(void)
     {
         _SelectedClicker = clicker_GetClickerAtIndex(0);
         _SelectedClickerChanged = 1;
-        LOG(LOG_DBG, "End try change selected clicker 2");
+
         sem_post(&semaphore);
         return 1;
     }
     _SelectedClicker = _SelectedClicker->next;
     _SelectedClickerChanged = 1;
-    LOG(LOG_DBG, "End try change selected clicker 3");
+
+    clicker_post();
     sem_post(&semaphore);
     return 1;
 }
@@ -350,6 +362,7 @@ static void HandleButton1Press(void)
 
 static void HandleButton2Press(void)
 {
+
     _Switch2Pressed = 0;
     if (_Mode == pd_Mode_LISTENING)
     {
@@ -357,8 +370,10 @@ static void HandleButton2Press(void)
         {
             _Mode = pd_Mode_PROVISIONING;
             _ModeChanged = true;
+            clicker_wait();
             _SelectedClicker->provisioningInProgress = true;
             history_RemoveProvisioned(_SelectedClicker->clickerID);
+            clicker_post();
         }
     }
     else
@@ -390,9 +405,10 @@ int pd_GetSelectedClickerId(void)
 {
     int result = -1;
     sem_wait(&semaphore);
+    clicker_wait();
     if (_SelectedClicker != NULL)
         result = _SelectedClicker->clickerID;
-
+    clicker_post();
     sem_post(&semaphore);
     return result;
 }
@@ -400,7 +416,7 @@ int pd_GetSelectedClickerId(void)
 int pd_SetSelectedClicker(int id)
 {
     sem_wait(&semaphore);
-
+    clicker_wait();
     int result = (_SelectedClicker != NULL) ? _SelectedClicker->clickerID : -1;
     Clicker* tmp = clicker_GetClickerByID(id);
     if (tmp != NULL)
@@ -409,29 +425,52 @@ int pd_SetSelectedClicker(int id)
         result = tmp->clickerID;
         _SelectedClickerChanged = 1;
     }
+    clicker_post();
     sem_post(&semaphore);
     return result;
 }
 
 void TryToSendPsk(Clicker *clicker)
 {
-    if (clicker->sharedKey != NULL && clicker->psk != NULL)
+
+    uint8_t *sharedKey = NULL;
+    uint8_t *psk = NULL;
+    char *identity = NULL;
+    uint8_t pskLen;
+    uint8_t identityLen;
+    uint8_t clickerID;
+    clicker_wait();
+    if (clicker->psk != NULL && clicker->sharedKey != NULL)
+    {
+        sharedKey = malloc(P_MODULE_LENGTH * sizeof(uint8_t));
+        memcpy(sharedKey, clicker->sharedKey, P_MODULE_LENGTH);
+        psk = malloc(clicker->pskLen * sizeof(uint8_t));
+        memcpy(psk, clicker->psk, clicker->pskLen);
+        pskLen = clicker->pskLen;
+        identity = malloc(clicker->identityLen);
+        memcpy(identity, clicker->identity, clicker->identityLen);
+        identityLen = clicker->identityLen;
+        clickerID = clicker->clickerID;
+    }
+
+    clicker_post();
+    if (sharedKey != NULL && psk != NULL)
     {
         memset(&_DeviceServerConfig, 0, sizeof(_DeviceServerConfig));
         _DeviceServerConfig.securityMode = 0;
 
-        memcpy(_DeviceServerConfig.psk, clicker->psk, clicker->pskLen);
-        _DeviceServerConfig.pskKeySize = clicker->pskLen;
+        memcpy(_DeviceServerConfig.psk, psk, pskLen);
+        _DeviceServerConfig.pskKeySize = pskLen;
 
-        memcpy(_DeviceServerConfig.identity, clicker->identity, clicker->identityLen);
-        _DeviceServerConfig.identitySize = clicker->identityLen;
+        memcpy(_DeviceServerConfig.identity, identity, identityLen);
+        _DeviceServerConfig.identitySize = identityLen;
 
         memcpy(_DeviceServerConfig.bootstrapUri, _PDConfig.bootstrapUri, strnlen(_PDConfig.bootstrapUri, 200));
         uint8_t dataLen = 0;
-        uint8_t *encodedData = softap_encodeBytes((uint8_t *)&_DeviceServerConfig, sizeof(_DeviceServerConfig) , clicker->sharedKey, &dataLen);
-        LOG(LOG_INFO, "Sending Device Server Config to clicker with id : %d", clicker->clickerID);
+        uint8_t *encodedData = softap_encodeBytes((uint8_t *)&_DeviceServerConfig, sizeof(_DeviceServerConfig) , sharedKey, &dataLen);
+        LOG(LOG_INFO, "Sending Device Server Config to clicker with id : %d", clickerID);
         con_SendCommandWithData(clicker, NetworkCommand_DEVICE_SERVER_CONFIG, encodedData, dataLen);
-        LOG(LOG_INFO, "Sent Device Server Config to clicker with id : %d", clicker->clickerID);
+        LOG(LOG_INFO, "Sent Device Server Config to clicker with id : %d", clickerID);
         FREE_AND_NULL(encodedData);
 
         memset(&_NetworkConfig, 0, sizeof(_NetworkConfig));
@@ -440,14 +479,21 @@ void TryToSendPsk(Clicker *clicker)
         memcpy(&_NetworkConfig.endpointName, _PDConfig.endPointNamePattern, strnlen(_PDConfig.endPointNamePattern, 24));
 
         dataLen = 0;
-        encodedData = softap_encodeBytes((uint8_t *)&_NetworkConfig, sizeof(_NetworkConfig) , clicker->sharedKey, &dataLen);
-        LOG(LOG_INFO, "Sending Network Config to clicker with id : %d", clicker->clickerID);
+        encodedData = softap_encodeBytes((uint8_t *)&_NetworkConfig, sizeof(_NetworkConfig) , sharedKey, &dataLen);
+        LOG(LOG_INFO, "Sending Network Config to clicker with id : %d", clickerID);
         con_SendCommandWithData(clicker, NetworkCommand_NETWORK_CONFIG, encodedData, dataLen);
-        LOG(LOG_INFO, "Sent Network Config to clicker with id : %d", clicker->clickerID);
+        LOG(LOG_INFO, "Sent Network Config to clicker with id : %d", clickerID);
         FREE_AND_NULL(encodedData);
-        LOG(LOG_INFO, "Provisioning of clicker with id : %d finished, going back to LISTENING mode", clicker->clickerID);
+        LOG(LOG_INFO, "Provisioning of clicker with id : %d finished, going back to LISTENING mode", clickerID);
+
+        clicker_wait();
         clicker->provisionTime = GetCurrentTimeMillis();
         clicker->provisioningInProgress = false;
+        clicker_post();
+
+        FREE_AND_NULL(sharedKey);
+        FREE_AND_NULL(psk);
+        FREE_AND_NULL(identity);
     }
 }
 
@@ -570,7 +616,7 @@ static int ParseCommandArgs(int argc, char *argv[], const char **fptr)
 {
     int opt, tmp;
     opterr = 0;
-    bool isConfigFileSpecified = false;
+
     char *configFilePath = NULL;
 
     while (1)
@@ -685,6 +731,7 @@ int main(int argc, char **argv)
             LOG(LOG_ERR, "Problems while acquiring buttons, local provision control might not work.");
     }
 
+
     clicker_InitSemaphore();
 
     if (ubusagent_Init() == false)
@@ -726,6 +773,8 @@ int main(int argc, char **argv)
 
         UpdateLeds();
 
+        clicker_wait();
+
         if (_SelectedClickerChanged)
         {
             LOG(LOG_INFO, "Selected Clicker ID : %d", _SelectedClicker->clickerID);
@@ -744,6 +793,7 @@ int main(int argc, char **argv)
             _Mode = pd_Mode_LISTENING;
         }
 
+
         Clicker *clk = clicker_GetClickers();
         while (clk != NULL)
         {
@@ -757,8 +807,11 @@ int main(int argc, char **argv)
 
         }
 
+        clicker_post();
+
         queue_Task *lastResult = queue_PopResult();
 
+        clicker_wait();
         if (lastResult != NULL)
         {
             Clicker *clicker = clicker_GetClickerByID(lastResult->clickerID);
@@ -813,6 +866,7 @@ int main(int argc, char **argv)
             }
             FREE_AND_NULL(lastResult);
         }
+        clicker_post();
 
         clicker_Purge();
 
@@ -839,11 +893,13 @@ int main(int argc, char **argv)
         }
 
         // disconnect already provisioned clicker after 3s timeout, timeout is important as if we disconnect clicker to early it may try to reconnect
+        clicker_wait();
         if (_SelectedClicker != NULL && _SelectedClicker->provisionTime > 0)
         {
             if (loopStartTime - _SelectedClicker->provisionTime > 3000)
                 con_Disconnect(_SelectedClicker);
         }
+        clicker_post();
 
         long long int loopEndTime = GetCurrentTimeMillis();
         if (loopEndTime - loopStartTime < 50)

@@ -35,49 +35,60 @@
 
 queue_Task * clicker_sm_GetNextTask(Clicker *clicker)
 {
+    clicker_wait();
+    int clickerID = clicker->clickerID;
+
     if (clicker == NULL)
     {
         LOG(LOG_WARN, "clicker_sm_GetNextTask: Passed clicker is NULL");
         return NULL;
     }
+
     if (clicker->taskInProgress)
+    {
+        clicker_post();
         return NULL;
+    }
 
     if (clicker->localKey == NULL)
     {
+        clicker_post();
         return queue_NewQueueTask
         (
             queue_TaskType_GENERATE_ALICE_KEY,
-            clicker->clickerID,
+            clickerID,
             NULL,
             0,
-            clicker->semaphore
+            NULL//clicker->semaphore
         );
     }
 
     if (clicker->localKey != NULL && clicker->remoteKey != NULL && clicker->sharedKey == NULL && clicker->provisioningInProgress)
     {
+        clicker_post();
         return queue_NewQueueTask
         (
             queue_TaskType_GENERATE_SHARED_KEY,
-            clicker->clickerID,
+            clickerID,
             NULL,
             0,
-            clicker->semaphore
+            NULL//clicker->semaphore
         );
     }
 
     if (clicker->psk == NULL && clicker->provisioningInProgress)
     {
+        clicker_post();
         return queue_NewQueueTask
         (
             queue_TaskType_GENERATE_PSK,
-            clicker->clickerID,
+            clickerID,
             NULL,
             0,
             clicker->semaphore
         );
     }
+    clicker_post();
 
     return NULL;
 }

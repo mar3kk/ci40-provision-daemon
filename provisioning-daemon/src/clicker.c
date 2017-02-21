@@ -37,6 +37,7 @@
 #include <semaphore.h>
 #include <time.h>
 #include <stdbool.h>
+#include <pthread.h>
 
 /**
  * Keeps a HEAD for the list of connected clickers
@@ -50,6 +51,11 @@ static Clicker *clickersToRelease = NULL;
 
 static sem_t semaphore;
 static int _IDCounter = 0;
+
+static pthread_mutex_t mutex;
+static pthread_mutexattr_t mutex_attr;
+
+
 
 
 static void Destroy(Clicker *clicker)
@@ -66,12 +72,11 @@ static void Destroy(Clicker *clicker)
 
 static void InnerAdd(Clicker **head, Clicker *clicker)
 {
-    sem_wait(&semaphore);
+
     if (*head == NULL)
     {
         *head = clicker;
         (*head)->next = NULL;
-        sem_post(&semaphore);
         return;
     }
     Clicker * current = *head;
@@ -81,29 +86,22 @@ static void InnerAdd(Clicker **head, Clicker *clicker)
     }
     current->next = clicker;
     clicker->next = NULL;
-    sem_post(&semaphore);
 }
 
 static void InnerRemove(Clicker **head, Clicker *clicker, bool doLock)
 {
-    if (doLock)
-        sem_wait(&semaphore);
 
     Clicker* current = *head;
     Clicker* previous = NULL;
 
     if (*head == NULL)
     {
-        if (doLock)
-            sem_post(&semaphore);
         return;
     }
 
     while (current != clicker)
     {
         if (current->next == NULL){
-            if (doLock)
-                sem_post(&semaphore);
             return;
         }
         else {
@@ -117,27 +115,23 @@ static void InnerRemove(Clicker **head, Clicker *clicker, bool doLock)
     else
         previous->next = current->next;
 
-    if (doLock)
-        sem_post(&semaphore);
 }
 
 static Clicker *InnerGetClickerByID(int id, bool doLock)
 {
-    if (doLock)
-        sem_wait(&semaphore);
+
     Clicker *ptr = clickers;
     while (ptr != NULL)
     {
         if (ptr->clickerID == id)
         {
             if (doLock)
-                sem_post(&semaphore);
+                pthread_mutex_unlock(&mutex);
             return ptr;
         }
         ptr = ptr->next;
     }
-    if (doLock)
-        sem_post(&semaphore);
+
     return NULL;
 }
 
@@ -170,7 +164,10 @@ Clicker *clicker_New(int socket)
 
 void clicker_InitSemaphore(void)
 {
-    sem_init(&semaphore, 0, 1);
+    pthread_mutexattr_init(&mutex_attr);
+    pthread_mutexattr_settype(&mutex_attr, PTHREAD_MUTEX_RECURSIVE);
+    pthread_mutex_init(&mutex, &mutex_attr);
+    //sem_init(&semaphore, 0, 1);
 }
 
 void clicker_Release(Clicker *clicker)
@@ -199,15 +196,13 @@ Clicker *clicker_InnerGetClickerAtIndex(int index)
 
 Clicker *clicker_GetClickerAtIndex(int index)
 {
-    sem_wait(&semaphore);
     Clicker* result = clicker_InnerGetClickerAtIndex(index);
-    sem_post(&semaphore);
     return result;
 }
 
 unsigned int clicker_GetClickersCount(void)
 {
-    sem_wait(&semaphore);
+
     int i = 0;
     Clicker *ptr = clickers;
     while (ptr != NULL)
@@ -215,7 +210,7 @@ unsigned int clicker_GetClickersCount(void)
         i++;
         ptr = ptr->next;
     }
-    sem_post(&semaphore);
+
     return i;
 }
 
@@ -226,10 +221,6 @@ Clicker *clicker_GetClickerByID(int id)
 
 int clicker_GetIndexOfClicker(Clicker* clicker)
 {
-    int t = sem_trywait(&semaphore);
-    if (t == 0)
-        sem_post(&semaphore);
-    sem_wait(&semaphore);
     int i = -1;
     Clicker *head = clickers;
     while (head != NULL)
@@ -237,12 +228,10 @@ int clicker_GetIndexOfClicker(Clicker* clicker)
         i++;
         if (clicker == head)
         {
-            sem_post(&semaphore);
             return i;
         }
         head = head->next;
     }
-    sem_post(&semaphore);
     return -1;
 }
 
@@ -253,38 +242,30 @@ Clicker *clicker_GetClickers(void)
 
 Clicker *clicker_AcquireOwnership(int clickerID)
 {
-    sem_wait(&semaphore);
     Clicker *clicker = InnerGetClickerByID(clickerID, false);
     if (clicker != NULL)
         clicker->ownershipsCount++;
-    sem_post(&semaphore);
 
     return clicker;
 }
 
 Clicker* clicker_AcquireOwnershipAtIndex(int index)
 {
-    sem_wait(&semaphore);
 
     Clicker* clicker = clicker_InnerGetClickerAtIndex(index);
     if (clicker != NULL)
         clicker->ownershipsCount++;
-
-    sem_post(&semaphore);
 
     return clicker;
 }
 
 void clicker_ReleaseOwnership(Clicker *clicker)
 {
-    sem_wait(&semaphore);
     clicker->ownershipsCount--;
-    sem_post(&semaphore);
 }
 
 void clicker_Purge(void)
 {
-    sem_wait(&semaphore);
     Clicker *current = clickersToRelease;
     while (current != NULL)
     {
@@ -300,5 +281,14 @@ void clicker_Purge(void)
             current = current->next;
         }
     }
-    sem_post(&semaphore);
+}
+
+void clicker_wait(void)
+{
+    pthread_mutex_lock(&mutex);
+}
+
+void clicker_post(void)
+{
+    pthread_mutex_unlock(&mutex);
 }

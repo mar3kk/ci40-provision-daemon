@@ -68,13 +68,18 @@ int g_pd_ConnectedClickers = 0;
 
 static void HandleDisconnect(Clicker *clicker)
 {
+    clicker_wait();
     int socket = clicker->socket;
+    int clickerID = clicker->clickerID;
+    clicker_post();
     getpeername(socket , (struct sockaddr*)&_Address , (socklen_t*)&_Addrlen);
     inet_ntop(AF_INET6, &(_Address).sin6_addr, _Inet6AddrBuffer, INET6_ADDRSTRLEN);
-    LOG(LOG_INFO, "Clicker disconnected, id : %d , ip %s , port %d \n" , clicker->clickerID, _Inet6AddrBuffer , ntohs(_Address.sin6_port));
+    LOG(LOG_INFO, "Clicker disconnected, id : %d , ip %s , port %d \n" , clickerID, _Inet6AddrBuffer , ntohs(_Address.sin6_port));
     close( socket );
     _ClickerDisconnectedCallback(clicker);
+    clicker_wait();
     clicker_Release(clicker);
+    clicker_post();
     g_pd_ConnectedClickers--;
 }
 
@@ -90,7 +95,9 @@ static void AcceptConnection(struct sockaddr_in6 *address)
     getpeername(newSocket , (struct sockaddr*)&_Address , (socklen_t*)&_Addrlen);
     inet_ntop(AF_INET6, &(*address).sin6_addr, _Inet6AddrBuffer, INET6_ADDRSTRLEN);
 
+    clicker_wait();
     Clicker *newClicker = clicker_New(newSocket);
+    clicker_post();
 
     LOG(LOG_INFO, "New clicker connected, id : %d, socket fd : %d, ip : %s, port : %d \n",
         newClicker->clickerID, newSocket, _Inet6AddrBuffer, ntohs((*address).sin6_port));
@@ -103,6 +110,7 @@ static int HandleRead(struct sockaddr_in6 *address)
 {
     int sd = 0;
     size_t valread = 0;
+    clicker_wait();
     Clicker *clicker = clicker_GetClickers();
     while (clicker != NULL)
     {
@@ -113,16 +121,19 @@ static int HandleRead(struct sockaddr_in6 *address)
             {
                 LOG(LOG_DBG, "Read error. Disconnecting");
                 HandleDisconnect(clicker);
+                clicker_post();
                 return 0;
             }
             else
             {
                 _CommandCallback(clicker, _Buffer);
+                clicker_post();
                 return 1;
             }
         }
         clicker = clicker->next;
     }
+    clicker_post();
     return 0;
 }
 
@@ -173,6 +184,8 @@ int con_BindAndListen(
 static void CheckConnections(void)
 {
     long currentTimeMillis = GetCurrentTimeMillis();
+
+    clicker_wait();
     Clicker *clicker = clicker_GetClickers();
 
     while(clicker != NULL)
@@ -182,6 +195,7 @@ static void CheckConnections(void)
 
         clicker = clicker->next;
     }
+    clicker_post();
 }
 
 void con_ProcessConnections(void)
@@ -192,6 +206,7 @@ void con_ProcessConnections(void)
     FD_SET(_MasterSocket, &_Readfs);
     _MaxSD = _MasterSocket;
 
+    clicker_wait();
     Clicker *ptr = clicker_GetClickers();
 
     while(ptr != NULL)
@@ -203,6 +218,7 @@ void con_ProcessConnections(void)
             _MaxSD = sd;
         ptr = ptr->next;
    }
+
 
     activity = select(_MaxSD + 1, &_Readfs, NULL, NULL, &_SelectTimeout);
 
@@ -235,33 +251,46 @@ void con_ProcessConnections(void)
         _LastCheckConnectionsTime = currentTimeMillis;
         CheckConnections();
     }
+    clicker_post();
 }
 
 
 void con_SendCommand(Clicker* clicker, NetworkCommand command)
 {
+    clicker_wait();
+    int socket = clicker->socket;
+    clicker_post();
     _Buffer[0] = command;
-    send(clicker->socket, _Buffer, 1, 0);
+    send(socket, _Buffer, 1, 0);
 }
 
 void con_SendCommandWithData(Clicker *clicker, NetworkCommand command, uint8_t *data, uint8_t dataLength)
 {
+    clicker_wait();
+    int socket = clicker->socket;
+    int clickerID = clicker->clickerID;
+    clicker_post();
     uint8_t buffer[dataLength+2];
 
     buffer[0] = command;
     buffer[1] = dataLength;
     memcpy(&buffer[2], data, dataLength);
-    send(clicker->socket, buffer, dataLength+2, 0);
+    send(socket, buffer, dataLength+2, 0);
 }
 
 void con_Disconnect(Clicker *clicker)
 {
+    clicker_wait();
     int socket = clicker->socket;
+    int clickerID = clicker->clickerID;
+    clicker_post();
     getpeername(socket , (struct sockaddr*)&_Address , (socklen_t*)&_Addrlen);
     inet_ntop(AF_INET6, &(_Address).sin6_addr, _Inet6AddrBuffer, INET6_ADDRSTRLEN);
-    LOG(LOG_INFO, "Clicker disconnected, id : %d , ip %s , port %d \n" , clicker->clickerID, _Inet6AddrBuffer , ntohs(_Address.sin6_port));
+    LOG(LOG_INFO, "Clicker disconnected, id : %d , ip %s , port %d \n" , clickerID, _Inet6AddrBuffer , ntohs(_Address.sin6_port));
     close( socket );
     _ClickerDisconnectedCallback(clicker);
+    clicker_wait();
     clicker_Release(clicker);
+    clicker_post();
     g_pd_ConnectedClickers--;
 }

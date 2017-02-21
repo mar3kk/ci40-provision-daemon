@@ -122,15 +122,22 @@ static queue_Task *queue_PopTask(void)
 
 static void queue_HandleGeneratelocalKey(queue_Task *task)
 {
+    clicker_wait();
     Clicker *clicker = clicker_AcquireOwnership(task->clickerID);
+    clicker_post();
     sem_wait(&semaphore);
+
+    clicker_wait();
     DiffieHellmanKeysExchanger *keysExchanger = clicker->keysExchanger;
     task->outData = (void*)dh_generateExchangeData(keysExchanger);
     task->outDataLength = keysExchanger->pModuleLength;
-
+    clicker_post();
     _Result = task;
     sem_post(&semaphore);
+
+    clicker_wait();
     clicker_ReleaseOwnership(clicker);
+    clicker_post();
 }
 
 static void queue_HandleGeneratePsk(queue_Task *task)
@@ -152,6 +159,7 @@ static void queue_HandleGeneratePsk(queue_Task *task)
 
 static void queue_HandleGenerateSharedKey(queue_Task *task)
 {
+    clicker_wait();
     Clicker *clicker = clicker_AcquireOwnership(task->clickerID);
     DiffieHellmanKeysExchanger *keysExchanger = clicker->keysExchanger;
     task->outData = (void*)dh_completeExchangeData(keysExchanger, clicker->remoteKey, keysExchanger->pModuleLength);
@@ -160,6 +168,7 @@ static void queue_HandleGenerateSharedKey(queue_Task *task)
     _Result = task;
     sem_post(&semaphore);
     clicker_ReleaseOwnership(clicker);
+    clicker_post();
 
 }
 

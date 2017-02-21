@@ -144,4 +144,8 @@ void clicker_ReleaseOwnership(Clicker *clicker);
  */
 void clicker_Purge(void);
 
+void clicker_wait(void);
+
+void clicker_post(void);
+
 #endif
