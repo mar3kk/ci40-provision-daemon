@@ -34,7 +34,6 @@
 
 #include <bits/alltypes.h>
 #include <bits/signal.h>
-#include <letmecreate/core/switch.h>
 #include <libconfig.h>
 #include <semaphore.h>
 #include <signal.h>
@@ -60,6 +59,8 @@
 #include "provision_history.h"
 #include "ubus_agent.h"
 #include "utils.h"
+#include "buttons.h"
+#include "event.h"
 
 /***************************************************************************************************
  * Definitions
@@ -117,12 +118,6 @@ static Clicker *_SelectedClicker = NULL;
  * Flag passed to main loop telling that selected clicker has changed so appropriate action can be taken.
  */
 static int _SelectedClickerChanged = 0;
-
-/**
- * Flags telling whether switch 1 or 2 has been pressed. Switch press handlers should zero that flags.
- */
-static short int _Switch1Pressed = 0;
-static short int _Switch2Pressed = 0;
 
 static bool _ModeChanged = false;
 
@@ -331,26 +326,29 @@ static int TryChangeSelectedClicker(void)
     return 1;
 }
 
-static void Switch1PressedCallback(void)
-{
-    if (_Mode == pd_Mode_LISTENING)
-        _Switch1Pressed = 1;
-}
-
-static void Switch2PressedCallback(void)
-{
-    _Switch2Pressed = 1;
-}
+//to remove
+//static void Switch1PressedCallback(void)
+//{
+//    if (_Mode == pd_Mode_LISTENING)
+//        _Switch1Pressed = 1;
+//}
+//
+//static void Switch2PressedCallback(void)
+//{
+//    _Switch2Pressed = 1;
+//}
 
 static void HandleButton1Press(void)
 {
-    _Switch1Pressed = 0;
+//to remove
+//    _Switch1Pressed = 0;
     TryChangeSelectedClicker();
 }
 
 static void HandleButton2Press(void)
 {
-    _Switch2Pressed = 0;
+//to remove
+//    _Switch2Pressed = 0;
     if (_Mode == pd_Mode_LISTENING)
     {
         if (_SelectedClicker != NULL)
@@ -637,7 +635,9 @@ void CleanupOnExit(void)
     bi_releaseConst();
     queue_Stop();
     if (_PDConfig.localProvisionControl)
-        switch_release();
+    {
+        buttons_shutdown();
+    }
 
     config_destroy(&_Cfg);
     sem_destroy(&semaphore);
@@ -667,6 +667,8 @@ int main(int argc, char **argv)
             LOG(LOG_ERR, "Failed to create or open %s file", fptr);
     }
 
+    event_init();
+
     g_debugLevel = _PDConfig.logLevel;
 
     bi_generateConst();
@@ -677,12 +679,7 @@ int main(int argc, char **argv)
 
     if (_PDConfig.localProvisionControl)
     {
-        LOG(LOG_INFO, "Enabling button controls.");
-        int result = switch_init();
-        result += switch_add_callback(0x02, Switch1PressedCallback);
-        result += switch_add_callback(0x04, Switch2PressedCallback);
-        if (result != 0)
-            LOG(LOG_ERR, "Problems while acquiring buttons, local provision control might not work.");
+        buttons_init();
     }
 
     clicker_InitSemaphore();
@@ -710,16 +707,21 @@ int main(int argc, char **argv)
 
         UpdateSelectedClicker();
 
+        Event* event = event_popEvent();
+
         // Handle buttons press
-        if (_PDConfig.localProvisionControl)
+        if (_PDConfig.localProvisionControl && event != NULL && event->type == EventType_BUTTON_PRESSED)
         {
-            if (_Switch1Pressed)
+            if (event->intData == BUTTON_1_ID)
                 HandleButton1Press();
 
-            if (_Switch2Pressed)
+            if (event->intData == BUTTON_2_ID)
                 HandleButton2Press();
         }
 
+        if (event != NULL) {
+            event_releaseEvent(&event);
+        }
 
         if (_ModeChanged)
             HandleModeChanged();
