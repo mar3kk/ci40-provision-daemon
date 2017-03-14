@@ -88,7 +88,7 @@ void queue_AddTask( queue_Task *task);
  */
 queue_Task * queue_PopResult(void);
 
-queue_Task * queue_NewQueueTask(queue_TaskType type, uint8_t clickerID, void * inData, uint8_t inDataLength, sem_t * sem);
+queue_Task * queue_NewQueueTask(queue_TaskType type, uint8_t clickerID, void * inData, uint8_t inDataLength);
 void queue_ReleaseTask(queue_Task * task);
 void queue_Start(void);
 void queue_Stop(void);

@@ -32,9 +32,8 @@
 #include "utils.h"
 #include "log.h"
 #include "commands.h"
-
+#include "crypto/crypto_config.h"
 #include <stdlib.h>
-#include <semaphore.h>
 #include <time.h>
 #include <stdbool.h>
 #include <glib.h>
@@ -42,14 +41,12 @@
 /**
  * Keeps a HEAD for the list of connected clickers
  */
-//static Clicker *clickers = NULL;
 static GQueue* clickersQueue = NULL;
 
+/** All operations are sync on this mutex */
 static GMutex mutex;
-static int _IDCounter = 0;
 
-static void Destroy(Clicker *clicker)
-{
+static void Destroy(Clicker *clicker) {
     dh_release(&clicker->keysExchanger);
     G_FREE_AND_NULL(clicker->localKey);
     G_FREE_AND_NULL(clicker->remoteKey);
@@ -96,16 +93,13 @@ static Clicker *InnerGetClickerByID(int id, bool doLock)
 }
 
 
-Clicker *clicker_New(int socket)
+void CreateNewClicker(int id)
 {
     Clicker *newClicker = g_new0(Clicker, 1);
 
-    newClicker->socket = socket;
-    newClicker->clickerID = ++_IDCounter;
-    newClicker->lastKeepAliveTime = GetCurrentTimeMillis();
+    newClicker->clickerID = id;
     newClicker->taskInProgress = false;
-    newClicker->next = NULL;
-    newClicker->keysExchanger = NULL;
+    newClicker->keysExchanger = dh_newKeyExchanger(g_KeyBuffer, P_MODULE_LENGTH, CRYPTO_G_MODULE, GenerateRandomX);
     newClicker->localKey = NULL;
     newClicker->remoteKey = NULL;
     newClicker->sharedKey = NULL;
@@ -122,8 +116,25 @@ Clicker *clicker_New(int socket)
     g_queue_push_tail(clickersQueue, newClicker);
     newClicker->ownershipsCount ++;
     g_mutex_unlock(&mutex);
+}
 
-    return newClicker;
+void RemoveFromCollection(int clickerID)
+{
+    Clicker* clicker = clicker_GetClickerByID(clickerID);
+    if (clicker == NULL) {
+        return;
+    }
+    LOG(LOG_DBG, "clicker_Release start");
+    g_mutex_lock(&mutex);
+
+    if (g_queue_remove(clickersQueue, clicker) == TRUE) {
+        clicker->ownershipsCount --;
+    } else {
+        LOG(LOG_ERR, "Internal error: Tried to remove clicker which is not a part of collection!");
+    }
+
+    ReleaseClickerIfNotOwned(clicker);
+    g_mutex_unlock(&mutex);
 }
 
 void clicker_Init(void)
@@ -136,21 +147,6 @@ void clicker_Shutdown(void) {
     g_queue_free(clickersQueue);
     g_mutex_clear(&mutex);
     clickersQueue = NULL;
-}
-
-void clicker_Release(Clicker *clicker)
-{
-    LOG(LOG_DBG, "clicker_Release start");
-    g_mutex_lock(&mutex);
-
-    if (g_queue_remove(clickersQueue, clicker) == TRUE) {
-        clicker->ownershipsCount --;
-    } else {
-        LOG(LOG_ERR, "Internal error: Tried to remove clicker which is not a part of collection!");
-    }
-
-    ReleaseClickerIfNotOwned(clicker);
-    g_mutex_unlock(&mutex);
 }
 
 Clicker *clicker_GetClickerAtIndex(int index)
@@ -218,4 +214,17 @@ void clicker_ReleaseOwnership(Clicker *clicker)
     clicker->ownershipsCount--;
     ReleaseClickerIfNotOwned(clicker);
     g_mutex_unlock(&mutex);
+}
+
+bool clicker_ConsumeEvent(Event* event) {
+    switch(event->type) {
+        case EventType_CLICKER_CREATE:
+            CreateNewClicker(event->intData);
+            return true;
+
+        case EventType_CLICKER_DESTROY:
+            RemoveFromCollection(event->intData);
+            return true;
+    }
+    return false;
 }

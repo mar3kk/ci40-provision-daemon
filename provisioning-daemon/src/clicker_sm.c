@@ -50,8 +50,7 @@ queue_Task * clicker_sm_GetNextTask(Clicker *clicker)
             queue_TaskType_GENERATE_ALICE_KEY,
             clicker->clickerID,
             NULL,
-            0,
-            clicker->semaphore
+            0
         );
     }
 
@@ -62,8 +61,7 @@ queue_Task * clicker_sm_GetNextTask(Clicker *clicker)
             queue_TaskType_GENERATE_SHARED_KEY,
             clicker->clickerID,
             NULL,
-            0,
-            clicker->semaphore
+            0
         );
     }
 
@@ -74,8 +72,7 @@ queue_Task * clicker_sm_GetNextTask(Clicker *clicker)
             queue_TaskType_GENERATE_PSK,
             clicker->clickerID,
             NULL,
-            0,
-            clicker->semaphore
+            0
         );
     }
 

@@ -33,8 +33,11 @@
 
 #include "clicker.h"
 #include "commands.h"
+#include "event.h"
 #include <stdint.h>
+#include <stdbool.h>
 #include <semaphore.h>
+#include <glib.h>
 
 #define TCP_PORT                                (49300)
 #define MAX_CLIENTS                             (30)
@@ -42,14 +45,22 @@
 #define KEEP_ALIVE_TIMEOUT_MS                   (30000)
 #define CHECK_CONNECTIONS_INTERVAL_MS           (2000)
 
+typedef struct {
+    int             clickerID;  /**< Clicker to which data should be send */
+    int             confirmationId;
+    NetworkCommand  command;
+    gpointer        data;       /**< if not NULL then this pointer will be released (g_free) after send! */
+    uint8_t         dataSize;
+} DataPackToSend;
+
 /**
  * @brief Keeps the number of currently connected clickers
  */
 extern int g_pd_ConnectedClickers;
 
-typedef void (*pd_CommandCallback)(Clicker *clicker, uint8_t * buffer);
-typedef void (*pd_ClickerConnectedCallback)(Clicker *clicker, char *ip);
-typedef void (*pd_ClickerDisconnectedCallback)(Clicker *clicker);
+typedef void (*pd_CommandCallback)(int clickerID, uint8_t * buffer);
+typedef void (*pd_ClickerConnectedCallback)(int clickerID, char *ip);
+typedef void (*pd_ClickerDisconnectedCallback)(int clickerID);
 
 /**
  * @brief Initiates socket, binds to it and start listening fror incoming connections
@@ -69,31 +80,16 @@ int con_BindAndListen(
 void con_ProcessConnections(void);
 
 /**
- * @brief Sends command to specified clicker.
- * @param clicker to which command will be send
- * @param command to send
- */
-void con_SendCommand(Clicker* clicker, NetworkCommand command);
-
-/**
- * @brief Send command to specified clicker.
- * @param clicker to which command will be send
- * @param command to send
- * @param data additional data that should be included in message
- * @param dataLength number of bytes in data array.
- */
-void con_SendCommandWithData(Clicker* clicker, NetworkCommand command, uint8_t *data, uint8_t dataLength);
-
-/**
- * @brief Gets position in clicker list of specified clicker
- * @return positive number being a position in list or -1 if specified clicker does not exist in list.
- */
-int con_GetIndexOfClicker(Clicker* clicker);
-
-/**
  * @brief Disconnect specified clicker
- * @param[in] clicker to disconnect
+ * @param[in] clickerID to disconnect
  */
-void con_Disconnect(Clicker *clicker);
+void con_Disconnect(int clickerID);
+
+/**
+ * @brief check if given event is clicker module relevant. If yes then proper handling is executed.
+ * @param[in] event Event to be consumed.
+ * @return true if event was handled, otherwise false
+ */
+bool con_ConsumeEvent(Event* event);
 
 #endif

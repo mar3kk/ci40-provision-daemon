@@ -225,7 +225,6 @@ static void ClickerDisconnectionHandler(Clicker *clicker)
 
 static void ClickerConnectionHandler(Clicker *clicker, char *ip)
 {
-    clicker->keysExchanger = dh_newKeyExchanger(g_KeyBuffer, P_MODULE_LENGTH, CRYPTO_G_MODULE, GenerateRandomX);
     char hash[10];
     GenerateClickerTimeHash(hash);
     char ipFragment[5];
@@ -707,6 +706,7 @@ int main(int argc, char **argv)
 
         UpdateSelectedClicker();
 
+        //---- EVENT LOOP ----
         Event* event = event_PopEvent();
 
         // Handle buttons press
@@ -718,10 +718,14 @@ int main(int argc, char **argv)
             if (event->intData == BUTTON_2_ID)
                 HandleButton2Press();
         }
+        //order of consumers DO MATTER !
+        con_ConsumeEvent(event);
+        clicker_ConsumeEvent(event);
 
         if (event != NULL) {
             event_releaseEvent(&event);
         }
+        //-----------------
 
         if (_ModeChanged)
             HandleModeChanged();

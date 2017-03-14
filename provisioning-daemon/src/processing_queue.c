@@ -206,7 +206,7 @@ static void * queue_Loop(void *arg)
     return NULL;
 }
 
-queue_Task *queue_NewQueueTask(queue_TaskType type, uint8_t clickerID, void * inData, uint8_t inDataLength, sem_t * sem)
+queue_Task *queue_NewQueueTask(queue_TaskType type, uint8_t clickerID, void * inData, uint8_t inDataLength)
 {
     queue_Task * newTask = malloc(sizeof(queue_Task));
     newTask->type = type;
@@ -215,7 +215,6 @@ queue_Task *queue_NewQueueTask(queue_TaskType type, uint8_t clickerID, void * in
     newTask->inDataLength = inDataLength;
     newTask->outData = NULL;
     newTask->outDataLength = 0;
-    newTask->semaphore = sem;
     newTask->next = NULL;
     return newTask;
 }
