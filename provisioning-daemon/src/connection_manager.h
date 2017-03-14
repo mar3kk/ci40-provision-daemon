@@ -79,6 +79,10 @@ void con_ProcessConnections(void);
  */
 void con_Disconnect(int clickerID);
 
+/**
+ * @brief returns count of open connections.
+ * @return count of connections
+ */
 int con_GetConnectionsCount();
 
 /**
@@ -88,5 +92,22 @@ int con_GetConnectionsCount();
  */
 bool con_ConsumeEvent(Event* event);
 
+/**
+ * @brief Allocate and returns NetworkDataPack struct filled with data passed as arguments.
+ * NOTE: this method take ownership of data argument, pass copy here if you don't want to release data pointer after
+ * send!
+ * @param[in] clickerID identifier of clicker to which data should be send
+ * @param[in] cmd Command to send
+ * @param[in] data Pointer to data passed to remote clicker, might be NULL
+ * @param[in] dataLen Size of data to send, might be 0
+ * @return pointer to newly created and filled NetworkDataPack
+ */
 NetworkDataPack* con_BuildNetworkDataPack(int clickerID, NetworkCommand cmd, uint8_t* data, uint16_t dataLen);
+
+/**
+ * @brief Returns IP address of clicker with given id. You don't own this pointer, copy data if needed but DO NOT
+ * cache it.
+ * @return IP of clicker or NULL if not found
+ */
+char* con_GetIPForClicker(int clickerId);
 #endif

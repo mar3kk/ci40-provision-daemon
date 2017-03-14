@@ -176,51 +176,75 @@ static void CtrlCHandler(int signal)
     _KeepRunning = 0;
 }
 
-static void HandleKeyCommand(Clicker *clicker, uint8_t *data)
+static void HandleKeyCommand(int clickerId, uint8_t *data)
 {
+    Clicker *clicker = clicker_AcquireOwnership(clickerId);
     uint8_t dataLength = data[1];
-    if (clicker->remoteKey != NULL)
-        FREE_AND_NULL(clicker->remoteKey);
+    FREE_AND_NULL(clicker->remoteKey);
     clicker->remoteKey = malloc(dataLength);
     memcpy(clicker->remoteKey, &data[2], dataLength);
+    clicker_ReleaseOwnership(clicker);
+
     LOG(LOG_INFO, "Received exchange key from clicker : %d", clicker->clickerID);
     PRINT_BYTES(clicker->remoteKey, P_MODULE_LENGTH);
-
 }
 
 /**
- * @brief Handles variuos commands received from clickers
+ * @brief Handles various commands received from clickers
  */
-static void CommandHandler(Clicker *clicker, uint8_t *buffer)
+static bool CommandHandler(NetworkDataPack* netData)
 {
-    switch (buffer[0]) {
+    switch (netData->command) {
         case NetworkCommand_KEY:
             LOG(LOG_DBG, "Received KEY command");
-            HandleKeyCommand(clicker, buffer);
+            HandleKeyCommand(netData->clickerID, netData->data);
             break;
+
         default:
-            LOG(LOG_WARN, "Unknown command received : %d", buffer[0]);
             break;
     }
+    return false;
 }
 
-static void ClickerDisconnectionHandler(Clicker *clicker)
+static void GenerateNameForClicker(int clickerId)
 {
-    if (_SelectedClicker == clicker)
-        _SelectedClicker = NULL;
-}
-
-static void ClickerConnectionHandler(Clicker *clicker, char *ip)
-{
+    char* ip = con_GetIPForClicker(clickerId);  //Note: we don't own this pointer, do not release!
+    if (ip == NULL) {
+        ip = "Unknown";
+    }
     char hash[10];
     GenerateClickerTimeHash(hash);
     char ipFragment[5];
     memset(ipFragment, 0, 5);
     strncpy(ipFragment, ip + strlen(ip) - 4, 4);
-    GenerateClickerName(clicker->name, COMMAND_ENDPOINT_NAME_LENGTH, (char*)_PDConfig.endPointNamePattern, hash, ipFragment);
-    LOG(LOG_INFO, "New clicker connected, ip : %s, id : %d, name : %s", ip, clicker->clickerID, clicker->name);
+    Clicker* clicker = clicker_AcquireOwnership(clickerId);
+    if (clicker != NULL) {
+        GenerateClickerName(clicker->name, COMMAND_ENDPOINT_NAME_LENGTH, (char*)_PDConfig.endPointNamePattern, hash,
+                ipFragment);
+        LOG(LOG_INFO, "New clicker connected, ip : %s, id : %d, name : %s", ip, clicker->clickerID, clicker->name);
+        clicker_ReleaseOwnership(clicker);
+    }
 }
 
+bool pd_ConsumeEvent(Event* event) {
+    switch(event->type) {
+        case EventType_CLICKER_DESTROY:
+            if (_SelectedClicker->clickerID == event->intData)  //TODO: well probably this will crash :)
+                _SelectedClicker = NULL;
+            return true;
+
+        case EventType_CLICKER_CREATE:
+            GenerateNameForClicker(event->intData);
+            return true;
+
+        case EventType_CONNECTION_RECEIVED_COMMAND:
+            return CommandHandler((NetworkDataPack*)event->ptrData);
+
+        default:
+            break;
+    }
+    return false;
+}
 /**
  * @bried Set the leds according to current app state.
  */
@@ -312,29 +336,13 @@ static int TryChangeSelectedClicker(void)
     return 1;
 }
 
-//to remove
-//static void Switch1PressedCallback(void)
-//{
-//    if (_Mode == pd_Mode_LISTENING)
-//        _Switch1Pressed = 1;
-//}
-//
-//static void Switch2PressedCallback(void)
-//{
-//    _Switch2Pressed = 1;
-//}
-
 static void HandleButton1Press(void)
 {
-//to remove
-//    _Switch1Pressed = 0;
     TryChangeSelectedClicker();
 }
 
 static void HandleButton2Press(void)
 {
-//to remove
-//    _Switch2Pressed = 0;
     if (_Mode == pd_Mode_LISTENING)
     {
         if (_SelectedClicker != NULL)
@@ -684,7 +692,7 @@ int main(int argc, char **argv)
         if (ubusagent_EnableRemoteControl() == false)
             LOG(LOG_ERR, "Problems with uBus, remote control is disabled!");
     }
-    con_BindAndListen(_PDConfig.tcpPort, CommandHandler, ClickerConnectionHandler, ClickerDisconnectionHandler);
+    con_BindAndListen(_PDConfig.tcpPort, CommandHandler, NULL, NULL);
     queue_Start();
     LOG(LOG_INFO, "Entering main loop");
     while(_KeepRunning)
@@ -710,6 +718,7 @@ int main(int argc, char **argv)
         //order of consumers DO MATTER !
         con_ConsumeEvent(event);
         clicker_ConsumeEvent(event);
+        pd_ConsumeEvent(event);
 
         if (event != NULL) {
             event_releaseEvent(&event);
@@ -844,7 +853,7 @@ int main(int argc, char **argv)
         if (_SelectedClicker != NULL && _SelectedClicker->provisionTime > 0)
         {
             if (loopStartTime - _SelectedClicker->provisionTime > 3000)
-                con_Disconnect(_SelectedClicker);
+                con_Disconnect(_SelectedClicker->clickerID);
         }
 
         long long int loopEndTime = GetCurrentTimeMillis();

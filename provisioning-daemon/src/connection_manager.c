@@ -285,7 +285,7 @@ gint CompareConnectionByClickerId(gpointer a, gpointer b) {
     return conn1->clickerID - conn2->clickerID;
 }
 
-ConnectionData* connectionForClickerId(int clickerID) {
+ConnectionData* ConnectionForClickerId(int clickerID) {
     ConnectionData tmp = {.clickerID = clickerID};
     GList* found = g_list_find_custom (_connectionsList, &tmp, (GCompareFunc)CompareConnectionByClickerId);
     return found != NULL ? found->data : NULL;
@@ -293,14 +293,14 @@ ConnectionData* connectionForClickerId(int clickerID) {
 
 void con_Disconnect(int clickerID)
 {
-    ConnectionData* found = connectionForClickerId(clickerID);
+    ConnectionData* found = ConnectionForClickerId(clickerID);
     if (found != NULL) {
         HandleDisconnect(found);
     }
 }
 
 void HandleSendCommandEvent(NetworkDataPack* data) {
-    ConnectionData* connection = connectionForClickerId(data->clickerID);
+    ConnectionData* connection = ConnectionForClickerId(data->clickerID);
     if (connection == NULL) {
         LOG(LOG_ERR, "Can't send data to clicker %d, connection not found! Command to send: %d",
                 data->clickerID, data->command);
@@ -344,4 +344,9 @@ NetworkDataPack* con_BuildNetworkDataPack(int clickerID, NetworkCommand cmd, uin
     pack->dataSize = dataLen;
 
     return pack;
+}
+
+char* con_GetIPForClicker(int clickerId) {
+    ConnectionData* data = ConnectionForClickerId(clickerId);
+    return data != NULL ? (char*)data->ip : NULL;
 }
