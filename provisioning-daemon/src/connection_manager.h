@@ -47,16 +47,10 @@
 
 typedef struct {
     int             clickerID;  /**< Clicker to which data should be send */
-    int             confirmationId;
     NetworkCommand  command;
     gpointer        data;       /**< if not NULL then this pointer will be released (g_free) after send! */
-    uint8_t         dataSize;
-} DataPackToSend;
-
-/**
- * @brief Keeps the number of currently connected clickers
- */
-extern int g_pd_ConnectedClickers;
+    uint16_t        dataSize;
+} NetworkDataPack;
 
 typedef void (*pd_CommandCallback)(int clickerID, uint8_t * buffer);
 typedef void (*pd_ClickerConnectedCallback)(int clickerID, char *ip);
@@ -85,6 +79,8 @@ void con_ProcessConnections(void);
  */
 void con_Disconnect(int clickerID);
 
+int con_GetConnectionsCount();
+
 /**
  * @brief check if given event is clicker module relevant. If yes then proper handling is executed.
  * @param[in] event Event to be consumed.
@@ -92,4 +88,5 @@ void con_Disconnect(int clickerID);
  */
 bool con_ConsumeEvent(Event* event);
 
+NetworkDataPack* con_BuildNetworkDataPack(int clickerID, NetworkCommand cmd, uint8_t* data, uint16_t dataLen);
 #endif

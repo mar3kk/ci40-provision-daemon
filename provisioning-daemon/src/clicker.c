@@ -225,6 +225,9 @@ bool clicker_ConsumeEvent(Event* event) {
         case EventType_CLICKER_DESTROY:
             RemoveFromCollection(event->intData);
             return true;
+
+        default:
+            break;
     }
     return false;
 }

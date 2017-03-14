@@ -115,24 +115,44 @@ static void AcceptConnection()
     //_ClickerConnectedCallback(newClicker, inet6AddrBuffer);
 }
 
+static void HandleReceivedData(ConnectionData* connection, uint8_t* buffer, size_t dataLen) {
+    NetworkCommand cmd = buffer[0];
+    if (cmd == NetworkCommand_KEEP_ALIVE) {
+        connection->lastKeepAliveTime = GetCurrentTimeMillis();
+
+    } else {
+        dataLen --; //skip info about command (1 byte)
+        NetworkDataPack* data = con_BuildNetworkDataPack(connection->clickerID, cmd, NULL, dataLen);
+        data->data = g_malloc(dataLen);
+        memcpy(data->data, buffer + 1, dataLen);
+
+        event_PushEventWithPtr(EventType_CONNECTION_RECEIVED_COMMAND, data, true);
+    }
+}
+
 static int HandleRead(fd_set* readFS) {
     int socket = 0;
     size_t valread = 0;
 
-    for (GList* iter = _connectionsList; iter != NULL; iter = iter->next) {
+    GList* tmpList = g_list_copy(_connectionsList);
+    uint8_t buffer[1024];
+    for (GList* iter = tmpList; iter != NULL; iter = iter->next) {
         ConnectionData* connection = (ConnectionData*) iter->data;
         socket = connection->socket;
-        char buffer[1024];
+
         memset(buffer, 0, sizeof(buffer));
         if (FD_ISSET(socket, readFS)) {
             if ((valread = read(socket, buffer, 1024)) == 0) {
                 LOG(LOG_DBG, "Read error. Disconnecting");
-                HandleDisconnect(connection);       //TODO: this will break list, defensive copy?
+                HandleDisconnect(connection);
             } else {
-                _CommandCallback(connection->clickerID, buffer);
+                HandleReceivedData(connection, buffer, valread);
+                //TODO: bind callback to handle this _CommandCallback(connection->clickerID, buffer);
             }
         }
     }
+
+    g_list_free(tmpList);
     return 0;
 }
 
@@ -265,16 +285,21 @@ gint CompareConnectionByClickerId(gpointer a, gpointer b) {
     return conn1->clickerID - conn2->clickerID;
 }
 
-void con_Disconnect(int clickerID)
-{
+ConnectionData* connectionForClickerId(int clickerID) {
     ConnectionData tmp = {.clickerID = clickerID};
     GList* found = g_list_find_custom (_connectionsList, &tmp, (GCompareFunc)CompareConnectionByClickerId);
+    return found != NULL ? found->data : NULL;
+}
+
+void con_Disconnect(int clickerID)
+{
+    ConnectionData* found = connectionForClickerId(clickerID);
     if (found != NULL) {
-        HandleDisconnect((ConnectionData*)found->data);
+        HandleDisconnect(found);
     }
 }
 
-void HandleSendCommandEvent(DataPackToSend* data) {
+void HandleSendCommandEvent(NetworkDataPack* data) {
     ConnectionData* connection = connectionForClickerId(data->clickerID);
     if (connection == NULL) {
         LOG(LOG_ERR, "Can't send data to clicker %d, connection not found! Command to send: %d",
@@ -282,7 +307,11 @@ void HandleSendCommandEvent(DataPackToSend* data) {
         return;
     }
     if (data->data != NULL && data->dataSize != 0) {
-        SendCommandWithData(connection, data->command, data->data, data->dataSize);
+        if (data->dataSize > 255) {
+            LOG(LOG_ERR, "Data size to send is to big, clickerId:%d, command:%d, size:%d",
+                    data->clickerID, data->command, data->dataSize);
+        }
+        SendCommandWithData(connection, data->command, data->data, (uint8_t)data->dataSize);
         g_free(data->data);
 
     } else {
@@ -296,6 +325,23 @@ bool con_ConsumeEvent(Event* event) {
         case EventType_CONNECTION_SEND_COMMAND:
             HandleSendCommandEvent(event->ptrData);
             return true;
+
+        default:
+            break;
     }
     return false;
+}
+
+int con_GetConnectionsCount() {
+    return g_list_length(_connectionsList);
+}
+
+NetworkDataPack* con_BuildNetworkDataPack(int clickerID, NetworkCommand cmd, uint8_t* data, uint16_t dataLen) {
+    NetworkDataPack* pack = g_new(NetworkDataPack, 1);
+    pack->clickerID = clickerID;
+    pack->command = cmd;
+    pack->data = data;
+    pack->dataSize = dataLen;
+
+    return pack;
 }

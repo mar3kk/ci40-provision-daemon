@@ -176,15 +176,6 @@ static void CtrlCHandler(int signal)
     _KeepRunning = 0;
 }
 
-/**
- * @brief Handles keep alive command received from clicker. Resets the timeout of socket.
- * @param clicker that sent the command
- */
-static void HandleKeepAliveCommand(Clicker *clicker)
-{
-    clicker->lastKeepAliveTime = GetCurrentTimeMillis();
-}
-
 static void HandleKeyCommand(Clicker *clicker, uint8_t *data)
 {
     uint8_t dataLength = data[1];
@@ -203,10 +194,6 @@ static void HandleKeyCommand(Clicker *clicker, uint8_t *data)
 static void CommandHandler(Clicker *clicker, uint8_t *buffer)
 {
     switch (buffer[0]) {
-        case NetworkCommand_KEEP_ALIVE:
-            LOG(LOG_DBG, "Received KEEP_ALIVE command");
-            HandleKeepAliveCommand(clicker);
-            break;
         case NetworkCommand_KEY:
             LOG(LOG_DBG, "Received KEY command");
             HandleKeyCommand(clicker, buffer);
@@ -259,7 +246,7 @@ static void UpdateLeds(void)
     }
     else
     {
-        SetLeds(g_pd_ConnectedClickers, clicker_GetIndexOfClicker(_SelectedClicker), g_activeLedOn);
+        SetLeds(con_GetConnectionsCount(), clicker_GetIndexOfClicker(_SelectedClicker), g_activeLedOn);
     }
 }
 
@@ -268,7 +255,7 @@ static void UpdateLeds(void)
  */
 static void UpdateSelectedClicker(void)
 {
-    int connectedClickersCount = g_pd_ConnectedClickers;
+    int connectedClickersCount = con_GetConnectionsCount();
 
     // if there are no connected clickers reset selected clicker
     if (connectedClickersCount == 0)
@@ -303,7 +290,7 @@ static int TryChangeSelectedClicker(void)
 {
     sem_wait(&semaphore);
     LOG(LOG_DBG, "Try change selected clicker");
-    int connectedClickersCount = g_pd_ConnectedClickers;
+    int connectedClickersCount = con_GetConnectionsCount();
     if (connectedClickersCount == 0)
     {
         LOG(LOG_DBG, "End try change selected clicker 1");
@@ -424,12 +411,14 @@ void TryToSendPsk(Clicker *clicker)
         _DeviceServerConfig.identitySize = clicker->identityLen;
 
         memcpy(_DeviceServerConfig.bootstrapUri, _PDConfig.bootstrapUri, strnlen(_PDConfig.bootstrapUri, 200));
+
         uint8_t dataLen = 0;
-        uint8_t *encodedData = softap_encodeBytes((uint8_t *)&_DeviceServerConfig, sizeof(_DeviceServerConfig) , clicker->sharedKey, &dataLen);
+        uint8_t *encodedData = softap_encodeBytes((uint8_t *)&_DeviceServerConfig, sizeof(_DeviceServerConfig) ,
+                clicker->sharedKey, &dataLen);
+        NetworkDataPack* netData = con_BuildNetworkDataPack(clicker->clickerID, NetworkCommand_DEVICE_SERVER_CONFIG,
+                encodedData, dataLen);
+        event_PushEventWithPtr(EventType_CONNECTION_SEND_COMMAND, netData, true);
         LOG(LOG_INFO, "Sending Device Server Config to clicker with id : %d", clicker->clickerID);
-        con_SendCommandWithData(clicker, NetworkCommand_DEVICE_SERVER_CONFIG, encodedData, dataLen);
-        LOG(LOG_INFO, "Sent Device Server Config to clicker with id : %d", clicker->clickerID);
-        FREE_AND_NULL(encodedData);
 
         memset(&_NetworkConfig, 0, sizeof(_NetworkConfig));
         memcpy(&_NetworkConfig.defaultRouteUri, _PDConfig.defaultRouteUri, strnlen(_PDConfig.defaultRouteUri, 100));
@@ -438,10 +427,11 @@ void TryToSendPsk(Clicker *clicker)
 
         dataLen = 0;
         encodedData = softap_encodeBytes((uint8_t *)&_NetworkConfig, sizeof(_NetworkConfig) , clicker->sharedKey, &dataLen);
-        LOG(LOG_INFO, "Sending Network Config to clicker with id : %d", clicker->clickerID);
-        con_SendCommandWithData(clicker, NetworkCommand_NETWORK_CONFIG, encodedData, dataLen);
-        LOG(LOG_INFO, "Sent Network Config to clicker with id : %d", clicker->clickerID);
+        netData = con_BuildNetworkDataPack(clicker->clickerID, NetworkCommand_NETWORK_CONFIG, encodedData, dataLen);
+        event_PushEventWithPtr(EventType_CONNECTION_SEND_COMMAND, netData, true);
         FREE_AND_NULL(encodedData);
+
+        LOG(LOG_INFO, "Sent Network Config to clicker with id : %d", clicker->clickerID);
         LOG(LOG_INFO, "Provisioning of clicker with id : %d finished, going back to LISTENING mode", clicker->clickerID);
         clicker->provisionTime = GetCurrentTimeMillis();
         clicker->provisioningInProgress = false;
@@ -567,7 +557,6 @@ static int ParseCommandArgs(int argc, char *argv[], const char **fptr)
 {
     int opt, tmp;
     opterr = 0;
-    bool isConfigFileSpecified = false;
     char *configFilePath = NULL;
 
     while (1)
@@ -737,12 +726,19 @@ int main(int argc, char **argv)
             LOG(LOG_INFO, "Selected Clicker ID : %d", _SelectedClicker->clickerID);
 
             // Send ENABLE_HIGHLIGHT command to active clicker and DISABLE_HIGHLIGHT to inactive clickers
-            con_SendCommand(_SelectedClicker, NetworkCommand_ENABLE_HIGHLIGHT);
+            NetworkDataPack* netData = con_BuildNetworkDataPack(_SelectedClicker->clickerID,
+                    NetworkCommand_ENABLE_HIGHLIGHT, NULL, 0);
+            event_PushEventWithPtr(EventType_CONNECTION_SEND_COMMAND, netData, true);
+
             Clicker * clicker = clicker_GetClickers();
             while (clicker != NULL)
             {
                 if (clicker != _SelectedClicker)
-                    con_SendCommand(clicker, NetworkCommand_DISABLE_HIGHLIGHT);
+                {
+                    netData = con_BuildNetworkDataPack(clicker->clickerID,
+                            NetworkCommand_DISABLE_HIGHLIGHT, NULL, 0);
+                    event_PushEventWithPtr(EventType_CONNECTION_SEND_COMMAND, netData, true);
+                }
 
                 clicker = clicker->next;
             }
@@ -778,7 +774,9 @@ int main(int argc, char **argv)
                         LOG(LOG_INFO, "Generated local Key");
                         PRINT_BYTES(clicker->localKey, P_MODULE_LENGTH);
                         LOG(LOG_INFO, "Sending local Key to clicker with id : %d", clicker->clickerID);
-                        con_SendCommandWithData(clicker, NetworkCommand_KEY, clicker->localKey, lastResult->outDataLength);
+                        NetworkDataPack* netData = con_BuildNetworkDataPack(clicker->clickerID,
+                                NetworkCommand_KEY, clicker->localKey, lastResult->outDataLength);
+                        event_PushEventWithPtr(EventType_CONNECTION_SEND_COMMAND, netData, true);
                         break;
                     case queue_TaskType_GENERATE_SHARED_KEY:
                         LOG(LOG_INFO, "Generated Shared Key");

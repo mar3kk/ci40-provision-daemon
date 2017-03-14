@@ -38,7 +38,8 @@ typedef enum {
     EventType_BUTTON_PRESSED,   //int as a button id
     EventType_CLICKER_CREATE,   //int - id of clicker
     EventType_CLICKER_DESTROY,  //int - id of clicker
-    EventType_CONNECTION_SEND_COMMAND, //ptr - point to DataPackToSend, ownership is passed to receiver
+    EventType_CONNECTION_SEND_COMMAND, //ptr - points to NetworkDataPack, ownership is passed to receiver
+    EventType_CONNECTION_RECEIVED_COMMAND, //ptr - points to NetworkDataPack (will be released on event destruction)
 } EventType;
 
 typedef struct {
