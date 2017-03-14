@@ -35,15 +35,15 @@
 
 static void Switch1PressedCallback(void)
 {
-    event_pushEventWithInt(EventType_BUTTON_PRESSED, BUTTON_1_ID);
+    event_PushEventWithInt(EventType_BUTTON_PRESSED, BUTTON_1_ID);
 }
 
 static void Switch2PressedCallback(void)
 {
-    event_pushEventWithInt(EventType_BUTTON_PRESSED, BUTTON_1_ID);
+    event_PushEventWithInt(EventType_BUTTON_PRESSED, BUTTON_1_ID);
 }
 
-bool buttons_init() {
+bool buttons_Init(void) {
     LOG(LOG_INFO, "[Setup] Enabling button controls.");
     int result = switch_init();
     result += switch_add_callback(0x02, Switch1PressedCallback);
@@ -55,6 +55,6 @@ bool buttons_init() {
     return result == 0;
 }
 
-void buttons_shutdown() {
+void buttons_Shutdown(void) {
     switch_release();
 }

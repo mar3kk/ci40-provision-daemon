@@ -34,19 +34,20 @@
 static GQueue* eventsQueue = NULL;
 static GMutex mutex;
 
-void event_init() {
+void event_Init(void) {
     eventsQueue = g_queue_new();
     g_mutex_init(&mutex);
 }
 
-void event_shutdown() {
+void event_Shutdown(void) {
     if (eventsQueue != NULL) {
         g_queue_free(eventsQueue);
         g_mutex_clear(&mutex);
     }
+    eventsQueue = NULL;
 }
 
-void event_pushEventWithInt(EventType type, int data) {
+void event_PushEventWithInt(EventType type, int data) {
     g_mutex_lock(&mutex);
     Event* event = g_new(Event, 1);
     event->type = type;
@@ -56,7 +57,7 @@ void event_pushEventWithInt(EventType type, int data) {
     g_mutex_unlock(&mutex);
 }
 
-void event_pushEventWithPtr(EventType type, void* dataPtr, bool freeDataOnRelease) {
+void event_PushEventWithPtr(EventType type, void* dataPtr, bool freeDataOnRelease) {
     g_mutex_lock(&mutex);
     Event* event = g_new(Event, 1);
     event->type = type;
@@ -66,7 +67,7 @@ void event_pushEventWithPtr(EventType type, void* dataPtr, bool freeDataOnReleas
     g_mutex_unlock(&mutex);
 }
 
-Event* event_popEvent() {
+Event* event_PopEvent(void) {
     g_mutex_lock(&mutex);
     Event* result = g_queue_pop_head(eventsQueue);
     g_mutex_unlock(&mutex);

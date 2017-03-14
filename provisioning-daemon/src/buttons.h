@@ -36,7 +36,7 @@
 #define BUTTON_1_ID     1
 #define BUTTON_2_ID     2
 
-bool buttons_init();
-void buttons_shutdown();
+bool buttons_Init(void);
+void buttons_Shutdown(void);
 
 #endif /* _BUTTONS_H_ */

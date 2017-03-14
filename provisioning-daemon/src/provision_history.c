@@ -37,6 +37,8 @@
 #include "provision_history.h"
 #include "log.h"
 
+//TODO: Rewrite to use glib structures
+
 //10 minutes
 #define MAX_LIVE_TIME  (10 * 60 * 1000)
 

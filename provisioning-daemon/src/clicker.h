@@ -84,7 +84,8 @@ void clicker_Release(Clicker *clicker);
  * @brief Initialize semaphore used to synchronize operations on clickers lists.
  * Should be called before any other function is called.
  */
-void clicker_InitSemaphore(void);
+void clicker_Init(void);
+void clicker_Shutdown(void);
 
 /**
  * @brief Get a clicker at specified index of the list.
@@ -138,10 +139,5 @@ Clicker* clicker_AcquireOwnershipAtIndex(int index);
  * @param[in] clicker clicker
  */
 void clicker_ReleaseOwnership(Clicker *clicker);
-
-/**
- * @brief Try to purge all clickers that are ready to be freed.
- */
-void clicker_Purge(void);
 
 #endif

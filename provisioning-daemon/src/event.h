@@ -47,21 +47,21 @@ typedef struct {
     bool freeDataPtrOnRelease;
 } Event;
 
-void event_init();
-void event_shutdown();
+void event_Init(void);
+void event_Shutdown(void);
 
 /** ----- All methods below are thread safe ---- **/
 /**
  * Adds new event to queue.
  */
-void event_pushEventWithInt(EventType type, int data);
-void event_pushEventWithPtr(EventType type, void* dataPtr, bool freeDataOnRelease);
+void event_PushEventWithInt(EventType type, int data);
+void event_PushEventWithPtr(EventType type, void* dataPtr, bool freeDataOnRelease);
 
 /**
  * Pops event from queue, if no events avail then NULL is returned. After handling returned event you should call
  * event_releaseEvent(&event).
  */
-Event* event_popEvent();
+Event* event_PopEvent(void);
 
 /**
  * Releases event struct from memory, if data associated with this event is an pointer, and event has flag

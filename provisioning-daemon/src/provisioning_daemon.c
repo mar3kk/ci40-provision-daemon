@@ -636,7 +636,7 @@ void CleanupOnExit(void)
     queue_Stop();
     if (_PDConfig.localProvisionControl)
     {
-        buttons_shutdown();
+        buttons_Shutdown();
     }
 
     config_destroy(&_Cfg);
@@ -667,7 +667,7 @@ int main(int argc, char **argv)
             LOG(LOG_ERR, "Failed to create or open %s file", fptr);
     }
 
-    event_init();
+    event_Init();
 
     g_debugLevel = _PDConfig.logLevel;
 
@@ -679,10 +679,10 @@ int main(int argc, char **argv)
 
     if (_PDConfig.localProvisionControl)
     {
-        buttons_init();
+        buttons_Init();
     }
 
-    clicker_InitSemaphore();
+    clicker_Init();
 
     if (ubusagent_Init() == false)
     {
@@ -707,7 +707,7 @@ int main(int argc, char **argv)
 
         UpdateSelectedClicker();
 
-        Event* event = event_popEvent();
+        Event* event = event_PopEvent();
 
         // Handle buttons press
         if (_PDConfig.localProvisionControl && event != NULL && event->type == EventType_BUTTON_PRESSED)
@@ -815,8 +815,6 @@ int main(int argc, char **argv)
             }
             FREE_AND_NULL(lastResult);
         }
-
-        clicker_Purge();
 
         // disconnect clickers with errors
         // Clicker *clicker = clicker_GetClickers();

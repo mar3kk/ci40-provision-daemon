@@ -38,6 +38,7 @@
 #define PRINT_BYTES(x,len) {int aai; printf("[");for(aai = 0; aai < len; aai++) { printf("%x",x[aai]);} printf("]\n");}
 
 #define FREE_AND_NULL( x ) if (x != NULL) {free( x ); x = NULL; }
+#define G_FREE_AND_NULL( x ) g_free( x ); x = NULL;
 
 /**
  * @brief Returns the current time in milliseconds
