@@ -57,9 +57,6 @@ typedef struct {
 static GList* _connectionsList = NULL;
 
 static int _MasterSocket;
-static pd_CommandCallback _CommandCallback;
-static pd_ClickerDisconnectedCallback _ClickerDisconnectedCallback;
-static pd_ClickerConnectedCallback _ClickerConnectedCallback;
 static unsigned long _LastKeepAliveSendTime = 0;
 static unsigned long _LastCheckConnectionsTime = 0;
 static int _IDCounter = 0;  /**< Used to give UIDs for newly created clickers */
@@ -76,7 +73,6 @@ static void HandleDisconnect(ConnectionData* connection)
     LOG(LOG_INFO, "Clicker disconnected, %s\n", buf);
     close( connection->socket );
 
-    //TODO: zobaczyc co to :) _ClickerDisconnectedCallback(connection->clickerID);
     event_PushEventWithInt(EventType_CLICKER_DESTROY, connection->clickerID);
 
     _connectionsList = g_list_remove(_connectionsList, connection);
@@ -110,9 +106,6 @@ static void AcceptConnection()
     char buf[1024];
     ConnectionDataToString(connection, buf, sizeof(buf));
     LOG(LOG_INFO, "New clicker connected: %s\n",buf);
-
-    //TODO: Obsluzyc nadanie nazwy w provision deamonie
-    //_ClickerConnectedCallback(newClicker, inet6AddrBuffer);
 }
 
 static void HandleReceivedData(ConnectionData* connection, uint8_t* buffer, size_t dataLen) {
@@ -147,7 +140,6 @@ static int HandleRead(fd_set* readFS) {
                 HandleDisconnect(connection);
             } else {
                 HandleReceivedData(connection, buffer, valread);
-                //TODO: bind callback to handle this _CommandCallback(connection->clickerID, buffer);
             }
         }
     }
@@ -156,15 +148,8 @@ static int HandleRead(fd_set* readFS) {
     return 0;
 }
 
-int con_BindAndListen(
-    int tcpPort,
-    pd_CommandCallback commandCallback,
-    pd_ClickerConnectedCallback clickerConnectedCallback,
-    pd_ClickerDisconnectedCallback clickerDisconnectedCallback)
+int con_BindAndListen(int tcpPort)
 {
-    _CommandCallback = commandCallback;
-    _ClickerConnectedCallback = clickerConnectedCallback;
-    _ClickerDisconnectedCallback = clickerDisconnectedCallback;
 
     int reuse_addr = 1;
 

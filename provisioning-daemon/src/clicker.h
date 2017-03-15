@@ -49,7 +49,9 @@
 typedef struct Clicker
 {
     struct Clicker *next;               /**< pointer to next element of list */
+    char* name;                         /**< Name which will be given to clicker after provision is done */
     int clickerID;                      /**< id of clicker, must be unique. */
+
     uint8_t *localKey;                  /**< Exchange key sent to remote clicker */
     uint8_t *remoteKey;                    /**< Exchange key received from remote clicker */
     uint8_t *sharedKey;                 /**< shared key used to encrypt communication with remote clicker */
@@ -57,13 +59,14 @@ typedef struct Clicker
     uint8_t pskLen;                     /**< Length of psk key */
     uint8_t *identity;                  /**< identity received from device server */
     size_t identityLen;                /**< Length of identity field */
-    bool taskInProgress;
     DiffieHellmanKeysExchanger *keysExchanger; /**< struct used to exchange crypto keys between provisioning daemon and remote clicker */
+
     uint8_t ownershipsCount;
+
+    bool taskInProgress;
+    bool provisioningInProgress;        /**< true - if provisioning is taking place on this clicker, otherwise false */
     unsigned long provisionTime;        /**< unix timestamp telling when provisioning process of this clicker has finished. 0 of provisioning is not finished yet. */
     int error;
-    char* name;
-    bool provisioningInProgress;        /**< true - if provisioning is taking place on this clicker, otherwise false */
 } Clicker;
 
 /**

@@ -149,3 +149,15 @@ void history_RemoveProvisioned(int id)
     }
     sem_post(&semaphore);
 }
+
+bool history_ConsumeEvent(Event* event) {
+    switch(event->type) {
+        case EventType_REMOVE_FROM_HISTORY:
+            history_RemoveProvisioned(event->intData);
+            return true;
+
+        default:
+            break;
+    }
+    return false;
+}

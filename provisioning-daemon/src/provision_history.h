@@ -32,6 +32,7 @@
 #define __PROVISION_HISTORY_H__
 #include <stdbool.h>
 #include "crypto/crypto_config.h"
+#include "event.h"
 
 #define MAX_HISTORY_NAME 40
 
@@ -46,6 +47,7 @@ void history_init(void);
 void history_destroy(void);
 void history_AddAsProvisioned(int id, char* name);
 void history_GetProvisioned(HistoryItem** listOfId, int* sizeOfList);
-void history_RemoveProvisioned(int id);
+void history_RemoveProvisioned(int id);     //todo: to remove, handled by events
+bool history_ConsumeEvent(Event* event);
 
 #endif /* __PROVISION_HISTORY_H__ */

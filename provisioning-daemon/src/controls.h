@@ -28,32 +28,16 @@
  * WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <letmecreate/letmecreate.h>
-#include "led.h"
+#ifndef _CONTROLS_H_
+#define _CONTROLS_H_
 
-void SetLeds(int numberOfClickers, int selectedClickerIndex, int activeClickerLedOn)
-{
-    uint8_t mask = 0;
-    int i = 0;
+#include <stdbool.h>
+#include "event.h"
 
-    if (numberOfClickers == 0)
-    {
-        led_release();
-        return;
-    }
+void controls_init(bool enableButtons);
+void controls_shutdown();
 
-    led_init();
+void controls_Update(void);
+bool controls_ConsumeEvent(Event* event);
 
-    for (i = 0; i < numberOfClickers; i++)
-        mask |= 1 << i;
-
-    if (activeClickerLedOn)
-        mask ^= 1 << selectedClickerIndex;
-
-    led_set(ALL_LEDS, mask);
-}
-
-void SetAllLeds(bool on)
-{
-    led_set(ALL_LEDS, on ? ALL_LEDS : 0);
-}
+#endif /* _CONTROLS_H_ */

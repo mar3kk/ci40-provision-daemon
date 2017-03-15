@@ -35,11 +35,12 @@
 #include <stdbool.h>
 
 typedef enum {
-    EventType_BUTTON_PRESSED,   //int as a button id
     EventType_CLICKER_CREATE,   //int - id of clicker
     EventType_CLICKER_DESTROY,  //int - id of clicker
     EventType_CONNECTION_SEND_COMMAND, //ptr - points to NetworkDataPack, ownership is passed to receiver
     EventType_CONNECTION_RECEIVED_COMMAND, //ptr - points to NetworkDataPack (will be released on event destruction)
+    EventType_CLICKER_START_PROVISION, //int - id of clicker to do provision
+    EventType_REMOVE_FROM_HISTORY, //int - id of clicker to remove
 } EventType;
 
 typedef struct {

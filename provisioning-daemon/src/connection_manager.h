@@ -52,21 +52,11 @@ typedef struct {
     uint16_t        dataSize;
 } NetworkDataPack;
 
-typedef void (*pd_CommandCallback)(int clickerID, uint8_t * buffer);
-typedef void (*pd_ClickerConnectedCallback)(int clickerID, char *ip);
-typedef void (*pd_ClickerDisconnectedCallback)(int clickerID);
-
 /**
- * @brief Initiates socket, binds to it and start listening fror incoming connections
- * @param commandCallback function called upon commands receive from clicker
- * @param clickerConnectedCallback function called upon new clicker connection
- * @param[in] clickerDisconnectedCallback function called upon clicker disconnection
+ * @brief Initiates socket, binds to it and start listening for incoming connections
+ * @param[in] tcpPort Port on which incoming connections will be expected
  */
-int con_BindAndListen(
-    int tcpPort,
-    pd_CommandCallback commandCallback,
-    pd_ClickerConnectedCallback clickerConnectedCallback,
-    pd_ClickerDisconnectedCallback clickerDisconnectedCallback);
+int con_BindAndListen(int tcpPort);
 
 /**
  *  @brief Accepts incoming connections and handles read from socket. Should be called periodically.

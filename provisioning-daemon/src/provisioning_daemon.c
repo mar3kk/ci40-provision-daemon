@@ -53,13 +53,12 @@
 #include "crypto/diffie_hellman_keys_exchanger.h"
 #include "crypto/encoder.h"
 #include "errors.h"
-#include "led.h"
+#include "controls.h"
 #include "log.h"
 #include "processing_queue.h"
 #include "provision_history.h"
 #include "ubus_agent.h"
 #include "utils.h"
-#include "buttons.h"
 #include "event.h"
 
 /***************************************************************************************************
@@ -69,9 +68,6 @@
 /** Calculate size of array. */
 #define ARRAY_SIZE(x) ((sizeof x) / (sizeof *x))
 
-#define LED_BLINK_INTERVAL_MS                     (500)
-#define P_LED_BLINK_INTERVAL_MS                 (100)
-#define HIGHLIGHT_INTERVAL_MS                    (500)
 #define DEFAULT_PATH_CONFIG_FILE                "/etc/config/provisioning_daemon"
 
 
@@ -125,13 +121,6 @@ static bool _ModeChanged = false;
  * Main loop condition.
  */
 static short int _KeepRunning = 1;
-
-/**
- * Time in millis of last led state has been changed.
- */
-static unsigned long _LastBlinkTime = 0;
-
-static int g_activeLedOn = 1;
 
 /**
  * Current app mode telling in which step of provisioning app currently  is.
@@ -245,137 +234,11 @@ bool pd_ConsumeEvent(Event* event) {
     }
     return false;
 }
-/**
- * @bried Set the leds according to current app state.
- */
-static void UpdateLeds(void)
-{
-    int interval = (_Mode == pd_Mode_LISTENING || _Mode == pd_Mode_ERROR) ? LED_BLINK_INTERVAL_MS : P_LED_BLINK_INTERVAL_MS;
-    unsigned long currentTime = GetCurrentTimeMillis();
-    if (currentTime - _LastBlinkTime > interval)
-    {
-        _LastBlinkTime = currentTime;
-        if (g_activeLedOn)
-            g_activeLedOn = 0;
-        else
-            g_activeLedOn = 1;
-    }
-
-    if (_Mode == pd_Mode_ERROR)
-    {
-        if (g_activeLedOn)
-            SetAllLeds(true);
-        else
-            SetAllLeds(false);
-    }
-    else
-    {
-        SetLeds(con_GetConnectionsCount(), clicker_GetIndexOfClicker(_SelectedClicker), g_activeLedOn);
-    }
-}
-
-/**
- * Validates whether currently selected clicker is still valid.
- */
-static void UpdateSelectedClicker(void)
-{
-    int connectedClickersCount = con_GetConnectionsCount();
-
-    // if there are no connected clickers reset selected clicker
-    if (connectedClickersCount == 0)
-    {
-        _SelectedClicker = NULL;
-        return;
-    }
-    // if there are connected clickers but we have not selected any yet
-    // select first clicker
-    if (_SelectedClicker == NULL)
-    {
-        _SelectedClicker = clicker_GetClickerAtIndex(0);
-        _SelectedClickerChanged = 1;
-        return;
-    }
-    if (clicker_GetIndexOfClicker(_SelectedClicker) > connectedClickersCount -1)
-    {
-        if (_SelectedClicker->next != NULL)
-            _SelectedClicker = _SelectedClicker->next;
-        else
-            _SelectedClicker = clicker_GetClickerAtIndex(0);
-    }
-}
-
-
-
-/**
- * @brief Tries to change selected clicker to next one if possible.
- * @return 1 if selected clicker has been successfully changed, 0 otherwise
- */
-static int TryChangeSelectedClicker(void)
-{
-    sem_wait(&semaphore);
-    LOG(LOG_DBG, "Try change selected clicker");
-    int connectedClickersCount = con_GetConnectionsCount();
-    if (connectedClickersCount == 0)
-    {
-        LOG(LOG_DBG, "End try change selected clicker 1");
-        sem_post(&semaphore);
-        return 0;
-    }
-    if (_SelectedClicker->next == NULL)
-    {
-        _SelectedClicker = clicker_GetClickerAtIndex(0);
-        _SelectedClickerChanged = 1;
-        LOG(LOG_DBG, "End try change selected clicker 2");
-        sem_post(&semaphore);
-        return 1;
-    }
-    _SelectedClicker = _SelectedClicker->next;
-    _SelectedClickerChanged = 1;
-    LOG(LOG_DBG, "End try change selected clicker 3");
-    sem_post(&semaphore);
-    return 1;
-}
-
-static void HandleButton1Press(void)
-{
-    TryChangeSelectedClicker();
-}
-
-static void HandleButton2Press(void)
-{
-    if (_Mode == pd_Mode_LISTENING)
-    {
-        if (_SelectedClicker != NULL)
-        {
-            _Mode = pd_Mode_PROVISIONING;
-            _ModeChanged = true;
-            _SelectedClicker->provisioningInProgress = true;
-            history_RemoveProvisioned(_SelectedClicker->clickerID);
-        }
-    }
-    else
-    {
-        _Mode = pd_Mode_LISTENING;
-        _ModeChanged = true;
-    }
-}
 
 bool pd_StartProvision(void)
 {
     int tmp = _Mode;
-    HandleButton2Press();
     return (_Mode == pd_Mode_LISTENING) && (_Mode != tmp);
-}
-
-static void HandleModeChanged(void)
-{
-    _ModeChanged = false;
-    if (_Mode == pd_Mode_LISTENING)
-        LOG(LOG_INFO, "Switched to LISTENING mode");
-    else if (_Mode == pd_Mode_PROVISIONING)
-        LOG(LOG_INFO, "Started provisioning of clicker with id : %d", _SelectedClicker->clickerID);
-    else
-        LOG(LOG_INFO, "Switched to ERROR mode");
 }
 
 int pd_GetSelectedClickerId(void)
@@ -630,10 +493,7 @@ void CleanupOnExit(void)
     ubusagent_Close();
     bi_releaseConst();
     queue_Stop();
-    if (_PDConfig.localProvisionControl)
-    {
-        buttons_Shutdown();
-    }
+    controls_shutdown();
 
     config_destroy(&_Cfg);
     sem_destroy(&semaphore);
@@ -672,11 +532,7 @@ int main(int argc, char **argv)
     signal(SIGINT, CtrlCHandler);
     sem_init(&semaphore, 0, 1);
     history_init();
-
-    if (_PDConfig.localProvisionControl)
-    {
-        buttons_Init();
-    }
+    controls_init(_PDConfig.localProvisionControl != 0);
 
     clicker_Init();
 
@@ -692,7 +548,7 @@ int main(int argc, char **argv)
         if (ubusagent_EnableRemoteControl() == false)
             LOG(LOG_ERR, "Problems with uBus, remote control is disabled!");
     }
-    con_BindAndListen(_PDConfig.tcpPort, CommandHandler, NULL, NULL);
+    con_BindAndListen(_PDConfig.tcpPort);
     queue_Start();
     LOG(LOG_INFO, "Entering main loop");
     while(_KeepRunning)
@@ -700,60 +556,22 @@ int main(int argc, char **argv)
         long long int loopStartTime = GetCurrentTimeMillis();
 
         con_ProcessConnections();
-
-        UpdateSelectedClicker();
+        controls_Update();
 
         //---- EVENT LOOP ----
         Event* event = event_PopEvent();
 
-        // Handle buttons press
-        if (_PDConfig.localProvisionControl && event != NULL && event->type == EventType_BUTTON_PRESSED)
-        {
-            if (event->intData == BUTTON_1_ID)
-                HandleButton1Press();
-
-            if (event->intData == BUTTON_2_ID)
-                HandleButton2Press();
-        }
-        //order of consumers DO MATTER !
-        con_ConsumeEvent(event);
-        clicker_ConsumeEvent(event);
-        pd_ConsumeEvent(event);
-
         if (event != NULL) {
+            //order of consumers DO MATTER !
+            con_ConsumeEvent(event);
+            clicker_ConsumeEvent(event);
+            controls_ConsumeEvent(event);
+            pd_ConsumeEvent(event);
+            history_ConsumeEvent(event);
+
             event_releaseEvent(&event);
         }
         //-----------------
-
-        if (_ModeChanged)
-            HandleModeChanged();
-
-        UpdateLeds();
-
-        if (_SelectedClickerChanged)
-        {
-            LOG(LOG_INFO, "Selected Clicker ID : %d", _SelectedClicker->clickerID);
-
-            // Send ENABLE_HIGHLIGHT command to active clicker and DISABLE_HIGHLIGHT to inactive clickers
-            NetworkDataPack* netData = con_BuildNetworkDataPack(_SelectedClicker->clickerID,
-                    NetworkCommand_ENABLE_HIGHLIGHT, NULL, 0);
-            event_PushEventWithPtr(EventType_CONNECTION_SEND_COMMAND, netData, true);
-
-            Clicker * clicker = clicker_GetClickers();
-            while (clicker != NULL)
-            {
-                if (clicker != _SelectedClicker)
-                {
-                    netData = con_BuildNetworkDataPack(clicker->clickerID,
-                            NetworkCommand_DISABLE_HIGHLIGHT, NULL, 0);
-                    event_PushEventWithPtr(EventType_CONNECTION_SEND_COMMAND, netData, true);
-                }
-
-                clicker = clicker->next;
-            }
-            _SelectedClickerChanged = 0;
-            _Mode = pd_Mode_LISTENING;
-        }
 
         Clicker *clk = clicker_GetClickers();
         while (clk != NULL)
