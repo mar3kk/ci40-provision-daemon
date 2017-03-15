@@ -37,6 +37,7 @@
 #include "controls.h"
 #include "provision_history.h"
 #include "utils.h"
+#include "commands.h"
 
 //forward declarations
 static int GetStateMethodHandler(struct ubus_context *ctx, struct ubus_object *obj, struct ubus_request_data *req,
@@ -46,6 +47,9 @@ static int SelectMethodHandler(struct ubus_context *ctx, struct ubus_object *obj
         const char *method, struct blob_attr *msg);
 
 static int StartProvisionMethodHandler(struct ubus_context *ctx, struct ubus_object *obj, struct ubus_request_data *req,
+        const char *method, struct blob_attr *msg);
+
+static int SetClickerNameMethodHandler(struct ubus_context *ctx, struct ubus_object *obj, struct ubus_request_data *req,
         const char *method, struct blob_attr *msg);
 
 //variables & structs
@@ -76,10 +80,23 @@ static const struct blobmsg_policy _SelectPolicy[] = {
 static const struct blobmsg_policy _StartProvisionPolicy[] = {
 };
 
+enum {
+     SET_CLICKER_NAME_CLICKER_ID,
+     SET_CLICKER_NAME_CLICKER_NAME,
+
+     SET_CLICKER_NAME_LAST
+ };
+
+ static const struct blobmsg_policy _SetClickerNamePolicy[] = {
+     [SET_CLICKER_NAME_CLICKER_ID] = {.name = "clickerID", .type = BLOBMSG_TYPE_INT32 },
+     [SET_CLICKER_NAME_CLICKER_NAME] = {.name = "clickerName", .type = BLOBMSG_TYPE_STRING }
+ };
+
 static const struct ubus_method _UBusAgentMethods[] = {
     UBUS_METHOD("getState", GetStateMethodHandler, _GetStatePolicy),
     UBUS_METHOD("select", SelectMethodHandler, _SelectPolicy),
-    UBUS_METHOD("startProvision", StartProvisionMethodHandler, _StartProvisionPolicy)
+    UBUS_METHOD("startProvision", StartProvisionMethodHandler, _StartProvisionPolicy),
+    UBUS_METHOD("setClickerName", SetClickerNameMethodHandler, _SetClickerNamePolicy)
 };
 
 static struct ubus_object_type _UBusAgentObjectType = UBUS_OBJECT_TYPE("provisioning-daemon", _UBusAgentMethods);
@@ -106,6 +123,36 @@ static const struct blobmsg_policy _GeneratePskResponsePolicy[GENERATE_PSK_RESPO
     [GENERATE_PSK_RESPONSE_PSK_SECRET] = {.name = "pskSecret", .type = BLOBMSG_TYPE_STRING},
     [GENERATE_PSK_RESPONSE_ERROR] = {.name = "error", .type = BLOBMSG_TYPE_STRING},
 };
+
+static int SetClickerNameMethodHandler(struct ubus_context *ctx, struct ubus_object *obj, struct ubus_request_data *req,
+        const char *method, struct blob_attr *msg) {
+
+    LOG(LOG_DBG, "uBusAgent: Requested SetClickerName");
+
+    struct blob_attr *args[SET_CLICKER_NAME_LAST];
+
+    blobmsg_parse(_SetClickerNamePolicy, SET_CLICKER_NAME_LAST, args, blob_data(msg), blob_len(msg));
+
+    int clickerID = blobmsg_get_u32(args[SET_CLICKER_NAME_CLICKER_ID]);
+
+    Clicker *clicker = clicker_AcquireOwnership(clickerID);
+    if (clicker == NULL) {
+        LOG(LOG_ERR, "uBusAgent: No clicker with id %d", clickerID);
+        return 1;
+    }
+
+    char *clickerName = blobmsg_get_string(args[SET_CLICKER_NAME_CLICKER_NAME]);
+
+    g_free(clicker->name);
+    int size = strlen(clickerName);
+    size = size > COMMAND_ENDPOINT_NAME_LENGTH ? COMMAND_ENDPOINT_NAME_LENGTH : size;
+    clicker->name = g_malloc( size );
+    strncpy(clicker->name, clickerName, COMMAND_ENDPOINT_NAME_LENGTH);
+
+    clicker_ReleaseOwnership(clicker);
+
+    return 0;
+}
 
 static int SelectMethodHandler(struct ubus_context *ctx, struct ubus_object *obj, struct ubus_request_data *req,
         const char *method, struct blob_attr *msg)

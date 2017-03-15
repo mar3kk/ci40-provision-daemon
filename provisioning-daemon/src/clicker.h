@@ -65,6 +65,7 @@ typedef struct Clicker
     DiffieHellmanKeysExchanger *keysExchanger; /**< struct used to exchange crypto keys between provisioning daemon and remote clicker */
 
     uint8_t ownershipsCount;
+    GMutex ownershipLock;
 
     bool taskInProgress;
     bool provisioningInProgress;        /**< true - if provisioning is taking place on this clicker, otherwise false */
@@ -80,39 +81,6 @@ void clicker_Init(void);
 void clicker_Shutdown(void);
 
 /**
- * @brief Get a clicker at specified index of the list.
- * @param[in] index lookup index
- * @return clicker or NULL if index is out of bounds
- */
-Clicker *clicker_GetClickerAtIndex(int index);
-
-/**
- * @brief Returns count of clickers in collections.
- * @return Count of clickers
- */
-unsigned int clicker_GetClickersCount(void);
-
-/**
- * @brief Get index of the list on which specified clicker is.
- * @param[in] clicker to look for
- * @return index represented as positive number or -1 if clicker is not in connected clickers list
- */
-int clicker_GetIndexOfClicker(Clicker *clicker);
-
-/**
- * @brief Get clicker with specified clickerID
- * @param[in] clickerID id of clicker to look for
- * @return found clicker or NULL
- */
-Clicker *clicker_GetClickerByID(int clickerID);
-
-/**
- * @brief Get head of connected clickers list
- * @return clicker or NULL if list is empty
- */
-Clicker *clicker_GetClickers(void);
-
-/**
  * @brief Mark clicker with specified ID as being used so it won't get purged until ownership is released.
  * @param[in] clickerID id of clicker
  * @return clicker or NULL if no clicker with specified ID exists in the list of connected clickers
@@ -124,6 +92,7 @@ Clicker *clicker_AcquireOwnership(int clickerID);
  * @param[in] index of clicker
  * @return clicker or NULL if no clicker at specified index exists in the list of connected clickers
  */
+//TODO: remove this method, it shuldn't exist
 Clicker* clicker_AcquireOwnershipAtIndex(int index);
 
 /**
