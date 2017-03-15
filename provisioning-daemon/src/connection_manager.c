@@ -115,10 +115,7 @@ static void HandleReceivedData(ConnectionData* connection, uint8_t* buffer, size
 
     } else {
         dataLen --; //skip info about command (1 byte)
-        NetworkDataPack* data = con_BuildNetworkDataPack(connection->clickerID, cmd, NULL, dataLen);
-        data->data = g_malloc(dataLen);
-        memcpy(data->data, buffer + 1, dataLen);
-
+        NetworkDataPack* data = con_BuildNetworkDataPack(connection->clickerID, cmd, buffer + 1, dataLen, true);
         event_PushEventWithPtr(EventType_CONNECTION_RECEIVED_COMMAND, data, true);
     }
 }
@@ -321,11 +318,19 @@ int con_GetConnectionsCount() {
     return g_list_length(_connectionsList);
 }
 
-NetworkDataPack* con_BuildNetworkDataPack(int clickerID, NetworkCommand cmd, uint8_t* data, uint16_t dataLen) {
+NetworkDataPack* con_BuildNetworkDataPack(int clickerID, NetworkCommand cmd, uint8_t* data, uint16_t dataLen,
+        bool copyData) {
+
     NetworkDataPack* pack = g_new(NetworkDataPack, 1);
     pack->clickerID = clickerID;
     pack->command = cmd;
-    pack->data = data;
+    if (copyData && dataLen > 0) {
+        pack->data = g_malloc(dataLen);
+        memcpy(pack->data, data, dataLen);
+
+    } else {
+        pack->data = data;
+    }
     pack->dataSize = dataLen;
 
     return pack;

@@ -44,6 +44,10 @@ typedef struct {
 
 void history_init(void);
 void history_destroy(void);
+
+/**
+ * @brief Returns array of HistoryItems.
+ */
 GArray* history_GetProvisioned(void);
 
 bool history_ConsumeEvent(Event* event);

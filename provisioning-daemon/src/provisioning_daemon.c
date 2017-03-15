@@ -55,7 +55,6 @@
 #include "errors.h"
 #include "controls.h"
 #include "log.h"
-#include "processing_queue.h"
 #include "provision_history.h"
 #include "ubus_agent.h"
 #include "utils.h"
@@ -165,36 +164,6 @@ static void CtrlCHandler(int signal)
     _KeepRunning = 0;
 }
 
-static void HandleKeyCommand(int clickerId, uint8_t *data)
-{
-    Clicker *clicker = clicker_AcquireOwnership(clickerId);
-    uint8_t dataLength = data[1];
-    FREE_AND_NULL(clicker->remoteKey);
-    clicker->remoteKey = malloc(dataLength);
-    memcpy(clicker->remoteKey, &data[2], dataLength);
-    clicker_ReleaseOwnership(clicker);
-
-    LOG(LOG_INFO, "Received exchange key from clicker : %d", clicker->clickerID);
-    PRINT_BYTES(clicker->remoteKey, P_MODULE_LENGTH);
-}
-
-/**
- * @brief Handles various commands received from clickers
- */
-static bool CommandHandler(NetworkDataPack* netData)
-{
-    switch (netData->command) {
-        case NetworkCommand_KEY:
-            LOG(LOG_DBG, "Received KEY command");
-            HandleKeyCommand(netData->clickerID, netData->data);
-            break;
-
-        default:
-            break;
-    }
-    return false;
-}
-
 static void GenerateNameForClicker(int clickerId)
 {
     char* ip = con_GetIPForClicker(clickerId);  //Note: we don't own this pointer, do not release!
@@ -215,6 +184,55 @@ static void GenerateNameForClicker(int clickerId)
     }
 }
 
+void TryToSendPsk(int clickerId)
+{
+    Clicker *clicker = clicker_AcquireOwnership(clickerId);
+    if (clicker == NULL) {
+        LOG(LOG_ERR, "TryToSendPsk: Can't acquire clicker with id:%d, wont continue!", clickerId);
+        return;
+    }
+
+    if (clicker->sharedKey != NULL && clicker->psk != NULL)
+    {
+        memset(&_DeviceServerConfig, 0, sizeof(_DeviceServerConfig));
+        _DeviceServerConfig.securityMode = 0;
+
+        memcpy(_DeviceServerConfig.psk, clicker->psk, clicker->pskLen);
+        _DeviceServerConfig.pskKeySize = clicker->pskLen;
+
+        memcpy(_DeviceServerConfig.identity, clicker->identity, clicker->identityLen);
+        _DeviceServerConfig.identitySize = clicker->identityLen;
+
+        memcpy(_DeviceServerConfig.bootstrapUri, _PDConfig.bootstrapUri, strnlen(_PDConfig.bootstrapUri, 200));
+
+        uint8_t dataLen = 0;
+        uint8_t *encodedData = softap_encodeBytes((uint8_t *)&_DeviceServerConfig, sizeof(_DeviceServerConfig) ,
+                clicker->sharedKey, &dataLen);
+        NetworkDataPack* netData = con_BuildNetworkDataPack(clicker->clickerID, NetworkCommand_DEVICE_SERVER_CONFIG,
+                encodedData, dataLen, false);
+        event_PushEventWithPtr(EventType_CONNECTION_SEND_COMMAND, netData, true);
+        LOG(LOG_INFO, "Sending Device Server Config to clicker with id : %d", clicker->clickerID);
+
+        memset(&_NetworkConfig, 0, sizeof(_NetworkConfig));
+        memcpy(&_NetworkConfig.defaultRouteUri, _PDConfig.defaultRouteUri, strnlen(_PDConfig.defaultRouteUri, 100));
+        memcpy(&_NetworkConfig.dnsServer, _PDConfig.dnsServer, strnlen(_PDConfig.dnsServer, 100));
+        memcpy(&_NetworkConfig.endpointName, clicker->name, strnlen(clicker->name, 24));
+
+        dataLen = 0;
+        encodedData = softap_encodeBytes((uint8_t *)&_NetworkConfig, sizeof(_NetworkConfig) , clicker->sharedKey, &dataLen);
+        netData = con_BuildNetworkDataPack(clicker->clickerID, NetworkCommand_NETWORK_CONFIG, encodedData, dataLen, false);
+        event_PushEventWithPtr(EventType_CONNECTION_SEND_COMMAND, netData, true);
+        FREE_AND_NULL(encodedData);
+
+        LOG(LOG_INFO, "Sent Network Config to clicker with id : %d", clicker->clickerID);
+        LOG(LOG_INFO, "Provisioning of clicker with id : %d finished, going back to LISTENING mode", clicker->clickerID);
+        clicker->provisionTime = GetCurrentTimeMillis();
+        clicker->provisioningInProgress = false;
+    }
+
+    clicker_ReleaseOwnership(clicker);
+}
+
 bool pd_ConsumeEvent(Event* event) {
     switch(event->type) {
         case EventType_CLICKER_DESTROY:
@@ -226,8 +244,9 @@ bool pd_ConsumeEvent(Event* event) {
             GenerateNameForClicker(event->intData);
             return true;
 
-        case EventType_CONNECTION_RECEIVED_COMMAND:
-            return CommandHandler((NetworkDataPack*)event->ptrData);
+        case EventType_TRY_TO_SEND_PSK_TO_CLICKER:
+            TryToSendPsk(event->intData);
+            return true;
 
         default:
             break;
@@ -266,47 +285,6 @@ int pd_SetSelectedClicker(int id)
     }
     sem_post(&semaphore);
     return result;
-}
-
-void TryToSendPsk(Clicker *clicker)
-{
-    if (clicker->sharedKey != NULL && clicker->psk != NULL)
-    {
-        memset(&_DeviceServerConfig, 0, sizeof(_DeviceServerConfig));
-        _DeviceServerConfig.securityMode = 0;
-
-        memcpy(_DeviceServerConfig.psk, clicker->psk, clicker->pskLen);
-        _DeviceServerConfig.pskKeySize = clicker->pskLen;
-
-        memcpy(_DeviceServerConfig.identity, clicker->identity, clicker->identityLen);
-        _DeviceServerConfig.identitySize = clicker->identityLen;
-
-        memcpy(_DeviceServerConfig.bootstrapUri, _PDConfig.bootstrapUri, strnlen(_PDConfig.bootstrapUri, 200));
-
-        uint8_t dataLen = 0;
-        uint8_t *encodedData = softap_encodeBytes((uint8_t *)&_DeviceServerConfig, sizeof(_DeviceServerConfig) ,
-                clicker->sharedKey, &dataLen);
-        NetworkDataPack* netData = con_BuildNetworkDataPack(clicker->clickerID, NetworkCommand_DEVICE_SERVER_CONFIG,
-                encodedData, dataLen);
-        event_PushEventWithPtr(EventType_CONNECTION_SEND_COMMAND, netData, true);
-        LOG(LOG_INFO, "Sending Device Server Config to clicker with id : %d", clicker->clickerID);
-
-        memset(&_NetworkConfig, 0, sizeof(_NetworkConfig));
-        memcpy(&_NetworkConfig.defaultRouteUri, _PDConfig.defaultRouteUri, strnlen(_PDConfig.defaultRouteUri, 100));
-        memcpy(&_NetworkConfig.dnsServer, _PDConfig.dnsServer, strnlen(_PDConfig.dnsServer, 100));
-        memcpy(&_NetworkConfig.endpointName, clicker->name, strnlen(clicker->name, 24));
-
-        dataLen = 0;
-        encodedData = softap_encodeBytes((uint8_t *)&_NetworkConfig, sizeof(_NetworkConfig) , clicker->sharedKey, &dataLen);
-        netData = con_BuildNetworkDataPack(clicker->clickerID, NetworkCommand_NETWORK_CONFIG, encodedData, dataLen);
-        event_PushEventWithPtr(EventType_CONNECTION_SEND_COMMAND, netData, true);
-        FREE_AND_NULL(encodedData);
-
-        LOG(LOG_INFO, "Sent Network Config to clicker with id : %d", clicker->clickerID);
-        LOG(LOG_INFO, "Provisioning of clicker with id : %d finished, going back to LISTENING mode", clicker->clickerID);
-        clicker->provisionTime = GetCurrentTimeMillis();
-        clicker->provisioningInProgress = false;
-    }
 }
 
 static bool ReadConfigFile(const char *filePath)
@@ -492,7 +470,6 @@ void CleanupOnExit(void)
 {
     ubusagent_Close();
     bi_releaseConst();
-    queue_Stop();
     controls_shutdown();
 
     config_destroy(&_Cfg);
@@ -549,7 +526,6 @@ int main(int argc, char **argv)
             LOG(LOG_ERR, "Problems with uBus, remote control is disabled!");
     }
     con_BindAndListen(_PDConfig.tcpPort);
-    queue_Start();
     LOG(LOG_INFO, "Entering main loop");
     while(_KeepRunning)
     {
@@ -559,91 +535,24 @@ int main(int argc, char **argv)
         controls_Update();
 
         //---- EVENT LOOP ----
-        Event* event = event_PopEvent();
+        while(true) {
+            Event* event = event_PopEvent();
 
-        if (event != NULL) {
+            if (event == NULL) {
+                break;
+            }
+
             //order of consumers DO MATTER !
             con_ConsumeEvent(event);
             clicker_ConsumeEvent(event);
             controls_ConsumeEvent(event);
             pd_ConsumeEvent(event);
+            clicker_sm_ConsumeEvent(event);
             history_ConsumeEvent(event);
 
             event_releaseEvent(&event);
         }
         //-----------------
-
-        Clicker *clk = clicker_GetClickers();
-        while (clk != NULL)
-        {
-            queue_Task *nextTask = clicker_sm_GetNextTask(clk);
-            if (nextTask != NULL)
-            {
-                queue_AddTask(nextTask);
-                clk->taskInProgress = true;
-            }
-            clk = clk->next;
-
-        }
-
-        queue_Task *lastResult = queue_PopResult();
-
-        if (lastResult != NULL)
-        {
-            Clicker *clicker = clicker_GetClickerByID(lastResult->clickerID);
-
-            if (clicker != NULL)
-            {
-                switch (lastResult->type)
-                {
-                    case queue_TaskType_GENERATE_ALICE_KEY:
-                        clicker->localKey = lastResult->outData;
-                        LOG(LOG_INFO, "Generated local Key");
-                        PRINT_BYTES(clicker->localKey, P_MODULE_LENGTH);
-                        LOG(LOG_INFO, "Sending local Key to clicker with id : %d", clicker->clickerID);
-                        NetworkDataPack* netData = con_BuildNetworkDataPack(clicker->clickerID,
-                                NetworkCommand_KEY, clicker->localKey, lastResult->outDataLength);
-                        event_PushEventWithPtr(EventType_CONNECTION_SEND_COMMAND, netData, true);
-                        break;
-                    case queue_TaskType_GENERATE_SHARED_KEY:
-                        LOG(LOG_INFO, "Generated Shared Key");
-                        clicker->sharedKey = lastResult->outData;
-                        PRINT_BYTES(clicker->sharedKey, P_MODULE_LENGTH);
-                        TryToSendPsk(clicker);
-                        break;
-                    case queue_TaskType_GENERATE_PSK:
-                        if (lastResult->outData <= 0)
-                        {
-                            LOG(LOG_WARN, "Couldn't get PSK from Device Server");
-                            clicker->error = pd_Error_GENERATE_PSK;
-                            _Mode = pd_Mode_ERROR;
-                            clicker->provisioningInProgress = false;
-                            break;
-                        }
-                        LOG(LOG_INFO, "Received PSK from Device Server: %s, dataLen:%d", (char*)lastResult->outData,
-                                lastResult->outDataLength);
-
-                        {
-                          queue_pskIdentityPair* pair = (queue_pskIdentityPair*)lastResult->outData;
-                          clicker->psk = malloc(pair->pskLen/2);
-                          HexStringToByteArray(pair->psk, clicker->psk, pair->pskLen/2);
-                          clicker->pskLen = pair->pskLen/2;
-                          clicker->identity = malloc(pair->identityLen + 1);
-                          strncpy(clicker->identity, pair->identity, pair->identityLen);
-                          clicker->identityLen = pair->identityLen;
-                        }
-
-                        TryToSendPsk(clicker);
-                        FREE_AND_NULL(lastResult->outData);
-                        history_AddAsProvisioned(clicker->clickerID, clicker->name);
-                        break;
-                    default:
-                        break;
-                }
-                clicker->taskInProgress = false;
-            }
-            FREE_AND_NULL(lastResult);
-        }
 
         // disconnect clickers with errors
         // Clicker *clicker = clicker_GetClickers();

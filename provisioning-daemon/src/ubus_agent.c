@@ -30,6 +30,7 @@
 #include <string.h>
 #include <semaphore.h>
 #include <sys/prctl.h>
+#include <glib.h>
 
 #include "log.h"
 #include "clicker.h"
@@ -149,22 +150,20 @@ static int GetStateMethodHandler(struct ubus_context *ctx, struct ubus_object *o
     LOG(LOG_DBG, "uBusAgent: GetState clicker count:%d, selected id:%d", clickersCount, selClickerId);
 
     //add history data
-    int historyCount = 0;
-    HistoryItem* history = NULL;
-    history_GetProvisioned(&history, &historyCount);
+    GArray* historyItems = history_GetProvisioned();
 
     blob_buf_init(&replyBloob, 0);
     void* cookie_array = blobmsg_open_array(&replyBloob, "clickers");
-    for(int t = 0; t < historyCount; t++)
+    for(int t = 0; t < historyItems->len; t++)
     {
         void* cookie_item = blobmsg_open_table(&replyBloob, "clicker");
-
-        blobmsg_add_u32(&replyBloob, "id", history[t].id);
-        blobmsg_add_string(&replyBloob, "name", history[t].name);
+        HistoryItem* history = &g_array_index(historyItems, HistoryItem, t);
+        blobmsg_add_u32(&replyBloob, "id", history->id);
+        blobmsg_add_string(&replyBloob, "name", history->name);
         blobmsg_add_u8(&replyBloob, "selected", false);
         blobmsg_add_u8(&replyBloob, "inProvisionState", false);
         blobmsg_add_u8(&replyBloob, "isProvisioned", true);
-        blobmsg_add_u8(&replyBloob, "isError", false);
+        blobmsg_add_u8(&replyBloob, "isError", history->isErrored);
         blobmsg_close_table(&replyBloob, cookie_item);
     }
 
@@ -177,9 +176,10 @@ static int GetStateMethodHandler(struct ubus_context *ctx, struct ubus_object *o
             continue;
 
         alreadyProvisioned = false;
-        for(int j = 0; j < historyCount; j++)
+        for(int j = 0; j < historyItems->len; j++)
         {
-            if (history[j].id == clk->clickerID)
+            HistoryItem* history = &g_array_index(historyItems, HistoryItem, j);
+            if (history->id == clk->clickerID)
             {
                 alreadyProvisioned = true;
                 break;
@@ -204,7 +204,7 @@ static int GetStateMethodHandler(struct ubus_context *ctx, struct ubus_object *o
 
         clicker_ReleaseOwnership(clk);
     }
-    FREE_AND_NULL(history);
+    g_array_free(historyItems, TRUE);
     blobmsg_close_array(&replyBloob, cookie_array);
 
     ubus_send_reply(ctx, req, replyBloob.head);
@@ -217,13 +217,15 @@ static void GeneratePskResponseHandler(struct ubus_request *req, int type, struc
     struct blob_attr *args[GENERATE_PSK_RESPONSE_MAX];
 
     blobmsg_parse(_GeneratePskResponsePolicy, GENERATE_PSK_RESPONSE_MAX, args, blob_data(msg), blob_len(msg));
-    pdubus_GeneratePskCallback callback = ((pdubus_GeneratePskRequest*)req->priv)->callback;
+    int clickerId = (int)req->priv;
 
     char *error = blobmsg_get_string(args[GENERATE_PSK_RESPONSE_ERROR]);
     if (error)
     {
         LOG(LOG_ERR, "uBusAgent: Error while generating PSK : %s", error);
-        callback(NULL, NULL, ((pdubus_GeneratePskRequest*)req->priv));
+        PreSharedKey* eventData = g_new0(PreSharedKey, 1);
+        eventData->clickerId = clickerId;
+        event_PushEventWithPtr(EventType_PSK_OBTAINED, eventData, true);
         return;
     }
 
@@ -232,7 +234,9 @@ static void GeneratePskResponseHandler(struct ubus_request *req, int type, struc
     if (!psk)
     {
         LOG(LOG_ERR, "uBusAgent: UNKNOWN PSK");
-        callback(NULL, NULL, ((pdubus_GeneratePskRequest*)req->priv));
+        PreSharedKey* eventData = g_new0(PreSharedKey, 1);
+        eventData->clickerId = clickerId;
+        event_PushEventWithPtr(EventType_PSK_OBTAINED, eventData, true);
         return;
     }
 
@@ -240,14 +244,26 @@ static void GeneratePskResponseHandler(struct ubus_request *req, int type, struc
     if (!identity)
     {
         LOG(LOG_ERR, "uBusAgent: UNKNOWN PSK");
-        callback(NULL, NULL, ((pdubus_GeneratePskRequest*)req->priv));
+        PreSharedKey* eventData = g_new0(PreSharedKey, 1);
+        eventData->clickerId = clickerId;
+        event_PushEventWithPtr(EventType_PSK_OBTAINED, eventData, true);
         return;
     }
 
     LOG(LOG_INFO, "uBusAgent: Obtained PSK: %s and IDENTITY: %s", psk, identity);
-    callback(psk, identity, ((pdubus_GeneratePskRequest*)req->priv));
 
-    return;
+    PreSharedKey* eventData = g_new0(PreSharedKey, 1);
+    eventData->clickerId = clickerId;
+
+    strncpy(eventData->identity, identity, PSK_ARRAYS_SIZE);
+    eventData->identityLen = strlen(identity);
+    eventData->identityLen = eventData->identityLen > PSK_ARRAYS_SIZE ? PSK_ARRAYS_SIZE : eventData->identityLen;
+
+    strncpy(eventData->psk, psk, PSK_ARRAYS_SIZE);
+    eventData->pskLen = strlen(psk);
+    eventData->pskLen = eventData->pskLen > PSK_ARRAYS_SIZE ? PSK_ARRAYS_SIZE : eventData->pskLen;
+
+    event_PushEventWithPtr(EventType_PSK_OBTAINED, eventData, true);
 }
 
 void HelperTimeoutHandler(struct uloop_timeout *t)
@@ -371,7 +387,7 @@ void ubusagent_Close(void)
 }
 
 //Warn: this is blocking call
-bool ubusagent_SendGeneratePskMessage(pdubus_GeneratePskRequest *request)
+bool ubusagent_SendGeneratePskMessage(int clickerId)
 {
     SetUBusLoopInterruption(true);
     WaitForInterruptState();
@@ -384,7 +400,7 @@ bool ubusagent_SendGeneratePskMessage(pdubus_GeneratePskRequest *request)
         return false;
     }
 
-    ret = ubus_invoke(_UbusCTX, id, "generatePsk", replyBloob.head, GeneratePskResponseHandler, (void*)request, 10000);
+    ret = ubus_invoke(_UbusCTX, id, "generatePsk", replyBloob.head, GeneratePskResponseHandler, (void*)clickerId, 10000);
     if (ret)
     {
         LOG(LOG_ERR, "uBusAgent: Filed to invoke generatePsk");

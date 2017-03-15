@@ -84,15 +84,15 @@ bool con_ConsumeEvent(Event* event);
 
 /**
  * @brief Allocate and returns NetworkDataPack struct filled with data passed as arguments.
- * NOTE: this method take ownership of data argument, pass copy here if you don't want to release data pointer after
- * send!
+ * NOTE: If copyData is false then this method will take ownership of data argument.
  * @param[in] clickerID identifier of clicker to which data should be send
  * @param[in] cmd Command to send
  * @param[in] data Pointer to data passed to remote clicker, might be NULL
  * @param[in] dataLen Size of data to send, might be 0
  * @return pointer to newly created and filled NetworkDataPack
  */
-NetworkDataPack* con_BuildNetworkDataPack(int clickerID, NetworkCommand cmd, uint8_t* data, uint16_t dataLen);
+NetworkDataPack* con_BuildNetworkDataPack(int clickerID, NetworkCommand cmd, uint8_t* data, uint16_t dataLen,
+        bool copyData);
 
 /**
  * @brief Returns IP address of clicker with given id. You don't own this pointer, copy data if needed but DO NOT

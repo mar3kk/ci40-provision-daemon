@@ -40,7 +40,10 @@ typedef enum {
     EventType_CONNECTION_SEND_COMMAND, //ptr - points to NetworkDataPack, ownership is passed to receiver
     EventType_CONNECTION_RECEIVED_COMMAND, //ptr - points to NetworkDataPack (will be released on event destruction)
     EventType_CLICKER_START_PROVISION, //int - id of clicker to do provision
-    EventType_REMOVE_FROM_HISTORY, //int - id of clicker to remove
+    EventType_PSK_OBTAINED, //ptr - points to PreSharedKey struct
+    EventType_HISTORY_REMOVE, //int - id of clicker to remove from history
+    EventType_HISTORY_ADD, //int - id of clicker to add to history
+    EventType_TRY_TO_SEND_PSK_TO_CLICKER,  //int - id of clicker to which PSK should be send
 } EventType;
 
 typedef struct {

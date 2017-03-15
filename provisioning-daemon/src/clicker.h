@@ -53,8 +53,11 @@ typedef struct Clicker
     int clickerID;                      /**< id of clicker, must be unique. */
 
     uint8_t *localKey;                  /**< Exchange key sent to remote clicker */
-    uint8_t *remoteKey;                    /**< Exchange key received from remote clicker */
+    int localKeyLength;                 /**< Length of local key */
+    uint8_t *remoteKey;                 /**< Exchange key received from remote clicker */
+    int remoteKeyLength;                /**< Length of remote key */
     uint8_t *sharedKey;                 /**< shared key used to encrypt communication with remote clicker */
+    int sharedKeyLength;                /**< Length of shared key */
     uint8_t *psk;                       /**< psk received from device server */
     uint8_t pskLen;                     /**< Length of psk key */
     uint8_t *identity;                  /**< identity received from device server */

@@ -33,18 +33,19 @@
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
-#include <semaphore.h>
 #include <glib.h>
+
 #include "provision_history.h"
 #include "log.h"
 #include "clicker.h"
+#include "utils.h"
 
 //10 minutes
 #define MAX_LIVE_TIME  (10 * 60 * 1000)
 
 typedef struct {
     char name[MAX_HISTORY_NAME];
-    long timestamp;
+    unsigned long timestamp;
     int id;
     bool isErrored;
 } HistoryEntry;
@@ -57,15 +58,7 @@ void history_init(void) {
 }
 
 void history_destroy(void) {
-    g_mutex_free(&mutex);
-}
-
-int getCurrentMilis(void) {
-    struct timespec spec;
-    clock_gettime(CLOCK_REALTIME, &spec);
-
-    long ms = round(spec.tv_nsec / 1.0e6);
-    return ms;
+    g_mutex_clear(&mutex);
 }
 
 void AddToHistory(int clickerId) {
@@ -76,7 +69,7 @@ void AddToHistory(int clickerId) {
     }
 
     HistoryEntry* entry = g_malloc(sizeof(HistoryEntry));
-    entry->timestamp = getCurrentMilis();
+    entry->timestamp = GetCurrentTimeMillis();
     entry->id = clickerId;
     entry->isErrored = false;
     strncpy(entry->name, clicker->name, MAX_HISTORY_NAME - 1);
@@ -91,7 +84,7 @@ void AddToHistory(int clickerId) {
 
 void PurgeOld(void) {
     //NOTE: called from inside mutex
-    long current = getCurrentMilis();
+    unsigned long current = GetCurrentTimeMillis();
 
     GSList* prev = NULL;
     for (GSList* iter = _historyElements; iter != NULL; iter = iter->next) {
@@ -121,7 +114,7 @@ GArray* history_GetProvisioned(void) {
         memset(item.name, 0, MAX_HISTORY_NAME);
         strcpy(item.name, entry->name);
         item.isErrored = entry->isErrored;
-        g_slist_append(result, &item);
+        g_array_append_val(result, item);
     }
     g_mutex_unlock(&mutex);
 
@@ -144,7 +137,6 @@ void history_RemoveProvisioned(int id) {
         }
         prev = iter;
     }
-
     g_mutex_unlock(&mutex);
 }
 

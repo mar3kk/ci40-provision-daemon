@@ -55,7 +55,7 @@ static void UpdateHighlights(void) {
         NetworkCommand cmdToSend = (t == selectedClickerIndex) ?
                 NetworkCommand_ENABLE_HIGHLIGHT : NetworkCommand_DISABLE_HIGHLIGHT;
         int clickerId = g_array_index(_connectedClickersId, int, t);
-        NetworkDataPack* netData = con_BuildNetworkDataPack(clickerId, cmdToSend, NULL, 0);
+        NetworkDataPack* netData = con_BuildNetworkDataPack(clickerId, cmdToSend, NULL, 0, false);
         event_PushEventWithPtr(EventType_CONNECTION_SEND_COMMAND, netData, true);
     }
 }
@@ -78,7 +78,7 @@ static void StartProvisionCallback(void)
     }
     int clickerId = g_array_index(_connectedClickersId, int, selectedClickerIndex);
     event_PushEventWithInt(EventType_CLICKER_START_PROVISION, clickerId);
-    event_PushEventWithInt(EventType_REMOVE_FROM_HISTORY, clickerId);
+    event_PushEventWithInt(EventType_HISTORY_REMOVE, clickerId);
     //TODO: implement
 /*
     if (_Mode == pd_Mode_LISTENING) {
