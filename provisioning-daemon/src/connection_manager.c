@@ -314,10 +314,6 @@ bool con_ConsumeEvent(Event* event) {
     return false;
 }
 
-int con_GetConnectionsCount() {
-    return g_list_length(_connectionsList);
-}
-
 NetworkDataPack* con_BuildNetworkDataPack(int clickerID, NetworkCommand cmd, uint8_t* data, uint16_t dataLen,
         bool copyData) {
 

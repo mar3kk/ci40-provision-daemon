@@ -181,6 +181,23 @@ static void RemoveClickerWithID(int clickerID) {
     }
 }
 
+static void SelectClickerWithId(int clickerId) {
+    for (guint t = 0; t < _connectedClickersId->len; t++) {
+        if (g_array_index(_connectedClickersId, int, t) == clickerId) {
+            selectedClickerIndex = t;
+            LOG(LOG_INFO, "Selected Clicker ID : %d", clickerId);
+            break;
+        }
+    }
+}
+
+int controls_GetSelectedClickerId() {
+    if (selectedClickerIndex < 0) {
+        return -1;
+    }
+    return g_array_index(_connectedClickersId, int, selectedClickerIndex);
+}
+
 bool controls_ConsumeEvent(Event* event) {
     switch(event->type) {
         case EventType_CLICKER_CREATE:
@@ -197,8 +214,14 @@ bool controls_ConsumeEvent(Event* event) {
             UpdateHighlights();
             return true;
 
+        case EventType_CLICKER_SELECT:
+            SelectClickerWithId(event->intData);
+            UpdateHighlights();
+            return true;
+
         default:
             break;
     }
+
     return false;
 }

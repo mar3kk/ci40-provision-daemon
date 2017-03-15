@@ -40,4 +40,6 @@ void controls_shutdown();
 void controls_Update(void);
 bool controls_ConsumeEvent(Event* event);
 
+int controls_GetSelectedClickerId();
+
 #endif /* _CONTROLS_H_ */

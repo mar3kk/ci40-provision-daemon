@@ -109,11 +109,6 @@ typedef struct {
  */
 static Clicker *_SelectedClicker = NULL;
 
-/**
- * Flag passed to main loop telling that selected clicker has changed so appropriate action can be taken.
- */
-static int _SelectedClickerChanged = 0;
-
 static bool _ModeChanged = false;
 
 /**
@@ -254,12 +249,6 @@ bool pd_ConsumeEvent(Event* event) {
     return false;
 }
 
-bool pd_StartProvision(void)
-{
-    int tmp = _Mode;
-    return (_Mode == pd_Mode_LISTENING) && (_Mode != tmp);
-}
-
 int pd_GetSelectedClickerId(void)
 {
     int result = -1;
@@ -267,22 +256,6 @@ int pd_GetSelectedClickerId(void)
     if (_SelectedClicker != NULL)
         result = _SelectedClicker->clickerID;
 
-    sem_post(&semaphore);
-    return result;
-}
-
-int pd_SetSelectedClicker(int id)
-{
-    sem_wait(&semaphore);
-
-    int result = (_SelectedClicker != NULL) ? _SelectedClicker->clickerID : -1;
-    Clicker* tmp = clicker_GetClickerByID(id);
-    if (tmp != NULL)
-    {
-        _SelectedClicker = tmp;
-        result = tmp->clickerID;
-        _SelectedClickerChanged = 1;
-    }
     sem_post(&semaphore);
     return result;
 }

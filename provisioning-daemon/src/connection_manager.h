@@ -70,12 +70,6 @@ void con_ProcessConnections(void);
 void con_Disconnect(int clickerID);
 
 /**
- * @brief returns count of open connections.
- * @return count of connections
- */
-int con_GetConnectionsCount();
-
-/**
  * @brief check if given event is clicker module relevant. If yes then proper handling is executed.
  * @param[in] event Event to be consumed.
  * @return true if event was handled, otherwise false

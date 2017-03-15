@@ -34,7 +34,7 @@
 
 #include "log.h"
 #include "clicker.h"
-#include "provisioning_daemon.h"
+#include "controls.h"
 #include "provision_history.h"
 #include "utils.h"
 
@@ -121,23 +121,21 @@ static int SelectMethodHandler(struct ubus_context *ctx, struct ubus_object *obj
 
     LOG(LOG_DBG, "uBusAgent: Select, move to clickerId:%d", clickerId);
 
-    int returnedId = pd_SetSelectedClicker(clickerId);
-    LOG(LOG_INFO, "uBusAgent: Tried to move to index %d, result is:%d", clickerId, returnedId);
+    event_PushEventWithInt(EventType_CLICKER_SELECT, clickerId);
 
-    return returnedId == clickerId ? UBUS_STATUS_OK : UBUS_STATUS_INVALID_ARGUMENT;
+    return UBUS_STATUS_OK;
 }
 
 static int StartProvisionMethodHandler(struct ubus_context *ctx, struct ubus_object *obj, struct ubus_request_data *req,
         const char *method, struct blob_attr *msg)
 {
-
     LOG(LOG_DBG, "uBusAgent: Requested StartProvision");
 
-    //handle startProvision
-    int ret = pd_StartProvision();
-    LOG(LOG_INFO, "uBusAgent: Start provision result: %d (0 = ok)", ret);
+    //TODO: web page can be upgraded to send clickeID, this allow to provision any visible clicker not only selected
+    int clickerId = controls_GetSelectedClickerId();
+    event_PushEventWithInt(EventType_CLICKER_START_PROVISION, clickerId);
 
-    return ret;
+    return UBUS_STATUS_OK;
 }
 
 static int GetStateMethodHandler(struct ubus_context *ctx, struct ubus_object *obj, struct ubus_request_data *req,
@@ -146,7 +144,7 @@ static int GetStateMethodHandler(struct ubus_context *ctx, struct ubus_object *o
     LOG(LOG_DBG, "uBusAgent: Requested GetState");
 
     unsigned int clickersCount = clicker_GetClickersCount();
-    int selClickerId = pd_GetSelectedClickerId();
+    int selClickerId = controls_GetSelectedClickerId();
     LOG(LOG_DBG, "uBusAgent: GetState clicker count:%d, selected id:%d", clickersCount, selClickerId);
 
     //add history data

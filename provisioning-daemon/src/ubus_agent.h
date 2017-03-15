@@ -36,12 +36,6 @@ typedef struct  {
     uint8_t identityLen;
 } PreSharedKey;
 
-typedef struct
-{
-    pdubus_GeneratePskCallback callback;
-    void *priv;
-} pdubus_GeneratePskRequest;
-
 /**
  * @brief Init ubus mechanism, register objects
  */
