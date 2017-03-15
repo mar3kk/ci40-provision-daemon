@@ -32,6 +32,7 @@
 #define _CONTROLS_H_
 
 #include <stdbool.h>
+#include <glib.h>
 #include "event.h"
 
 void controls_init(bool enableButtons);
@@ -41,5 +42,8 @@ void controls_Update(void);
 bool controls_ConsumeEvent(Event* event);
 
 int controls_GetSelectedClickerId();
+
+//Note: you owning returned data!
+GArray* controls_GetAllClickersIds();
 
 #endif /* _CONTROLS_H_ */

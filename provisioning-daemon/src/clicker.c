@@ -41,6 +41,7 @@
 /**
  * Keeps a HEAD for the list of connected clickers
  */
+//TODO: I'm certain that this should be hashmap
 static GQueue* clickersQueue = NULL;
 
 /** All operations are sync on this mutex */
@@ -165,19 +166,6 @@ Clicker *clicker_AcquireOwnership(int clickerID)
     Clicker *clicker = InnerGetClickerByID(clickerID, false);
     if (clicker != NULL)
         clicker->ownershipsCount++;
-    g_mutex_unlock(&mutex);
-
-    return clicker;
-}
-
-Clicker* clicker_AcquireOwnershipAtIndex(int index)
-{
-    g_mutex_lock(&mutex);
-
-    Clicker* clicker = g_queue_peek_nth(clickersQueue, index);
-    if (clicker != NULL)
-        clicker->ownershipsCount++;
-
     g_mutex_unlock(&mutex);
 
     if (clicker != NULL)

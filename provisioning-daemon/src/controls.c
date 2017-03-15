@@ -198,6 +198,13 @@ int controls_GetSelectedClickerId() {
     return g_array_index(_connectedClickersId, int, selectedClickerIndex);
 }
 
+GArray* controls_GetAllClickersIds() {
+    GArray* result = g_array_new(FALSE, FALSE, sizeof(int));
+    int* pos = &g_array_index(_connectedClickersId, int, 0);
+    g_array_append_vals(result, pos, _connectedClickersId->len);
+    return result;
+}
+
 bool controls_ConsumeEvent(Event* event) {
     switch(event->type) {
         case EventType_CLICKER_CREATE:

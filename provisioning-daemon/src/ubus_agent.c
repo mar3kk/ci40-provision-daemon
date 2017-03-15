@@ -190,9 +190,9 @@ static int GetStateMethodHandler(struct ubus_context *ctx, struct ubus_object *o
 {
     LOG(LOG_DBG, "uBusAgent: Requested GetState");
 
-    unsigned int clickersCount = clicker_GetClickersCount();
+    GArray* connectedClickers = controls_GetAllClickersIds();
     int selClickerId = controls_GetSelectedClickerId();
-    LOG(LOG_DBG, "uBusAgent: GetState clicker count:%d, selected id:%d", clickersCount, selClickerId);
+    LOG(LOG_DBG, "uBusAgent: GetState clicker count:%d, selected id:%d", connectedClickers->len, selClickerId);
 
     //add history data
     GArray* historyItems = history_GetProvisioned();
@@ -214,9 +214,9 @@ static int GetStateMethodHandler(struct ubus_context *ctx, struct ubus_object *o
 
     bool alreadyProvisioned = false;
 
-    for(int t = 0; t < clickersCount; t++)
+    for(int t = 0; t < connectedClickers->len; t++)
     {
-        Clicker* clk = clicker_AcquireOwnershipAtIndex(t);
+        Clicker* clk = clicker_AcquireOwnership( g_array_index(connectedClickers, int, t) );
         if (clk == NULL)
             continue;
 
@@ -250,6 +250,7 @@ static int GetStateMethodHandler(struct ubus_context *ctx, struct ubus_object *o
         clicker_ReleaseOwnership(clk);
     }
     g_array_free(historyItems, TRUE);
+    g_array_free(connectedClickers, TRUE);
     blobmsg_close_array(&replyBloob, cookie_array);
 
     ubus_send_reply(ctx, req, replyBloob.head);
