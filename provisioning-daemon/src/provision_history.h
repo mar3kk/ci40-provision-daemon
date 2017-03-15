@@ -39,15 +39,13 @@
 typedef struct {
     int id;
     char name[MAX_HISTORY_NAME];
-    uint8_t remoteKey[P_MODULE_LENGTH];
     bool isErrored;
 } HistoryItem;
 
 void history_init(void);
 void history_destroy(void);
-void history_AddAsProvisioned(int id, char* name);
-void history_GetProvisioned(HistoryItem** listOfId, int* sizeOfList);
-void history_RemoveProvisioned(int id);     //todo: to remove, handled by events
+GArray* history_GetProvisioned(void);
+
 bool history_ConsumeEvent(Event* event);
 
 #endif /* __PROVISION_HISTORY_H__ */
