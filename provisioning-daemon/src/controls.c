@@ -35,10 +35,9 @@
 #include <letmecreate/letmecreate.h>
 #include <glib.h>
 
-#define LED_BLINK_INTERVAL_MS                   (500)
-#define P_LED_BLINK_INTERVAL_MS                 (100)
-#define HIGHLIGHT_INTERVAL_MS                   (500)
-
+#define LED_SLOW_BLINK_INTERVAL_MS              (500)
+#define LED_FAST_BLINK_INTERVAL_MS              (100)
+#define TIME_TO_DISCONNECT_AFTER_PROVISION      3000
 /**
  * Time in millis of last led state has been changed.
  */
@@ -77,22 +76,17 @@ static void StartProvisionCallback(void)
         return;
     }
     int clickerId = g_array_index(_connectedClickersId, int, selectedClickerIndex);
+
+    Clicker* clicker = clicker_AcquireOwnership(clickerId);
+    if (clicker == NULL) {
+        LOG(LOG_ERR, "No clicker with id:%d, this is internal error.", clickerId);
+        return;
+    }
+    clicker->provisioningInProgress = true;
+    clicker_ReleaseOwnership(clicker);
+
     event_PushEventWithInt(EventType_CLICKER_START_PROVISION, clickerId);
     event_PushEventWithInt(EventType_HISTORY_REMOVE, clickerId);
-    //TODO: implement
-/*
-    if (_Mode == pd_Mode_LISTENING) {
-        if (_SelectedClicker != NULL) {
-            _Mode = pd_Mode_PROVISIONING;
-            _ModeChanged = true;
-            _SelectedClicker->provisioningInProgress = true;
-            history_RemoveProvisioned(_SelectedClicker->clickerID);
-        }
-    } else {
-        _Mode = pd_Mode_LISTENING;
-        _ModeChanged = true;
-    }
-     */
 }
 
 void controls_init(bool enableButtons) {
@@ -137,30 +131,47 @@ static void SetLeds(void)
     led_set(ALL_LEDS, mask);
 }
 
+void CheckForFinishedProvisionings(void) {
+    for (guint t = 0; t < _connectedClickersId->len; t++) {
+        int clickerId = g_array_index(_connectedClickersId, int, t);
+        Clicker* clicker = clicker_AcquireOwnership(clickerId);
+        if (clicker == NULL) {
+            LOG(LOG_ERR, "No clicker with id:%d, this is internal error.", clickerId);
+            continue;
+        }
+        if (clicker->provisionTime > 0) {
+            if (GetCurrentTimeMillis() - clicker->provisionTime > TIME_TO_DISCONNECT_AFTER_PROVISION) {
+                con_Disconnect(clicker->clickerID);
+            }
+        }
+        clicker_ReleaseOwnership(clicker);
+    }
+}
+
 /**
  * @bried Set the leds according to current app state.
  */
 void controls_Update(void) {
-    //TODO: this need to be rewriten to handle state of each clicker.
-    SetLeds();
-    /*
-    int interval =
-            (_Mode == pd_Mode_LISTENING || _Mode == pd_Mode_ERROR) ? LED_BLINK_INTERVAL_MS : P_LED_BLINK_INTERVAL_MS;
+    int clickerId = controls_GetSelectedClickerId();
+
+    Clicker* clicker = clicker_AcquireOwnership(clickerId);
+    if (clicker == NULL) {
+        LOG(LOG_ERR, "No clicker with id:%d, this is internal error.", clickerId);
+        return;
+    }
+
+    int interval = clicker->provisioningInProgress ? LED_FAST_BLINK_INTERVAL_MS : LED_SLOW_BLINK_INTERVAL_MS;
+
+    clicker_ReleaseOwnership(clicker);
+
     unsigned long currentTime = GetCurrentTimeMillis();
     if (currentTime - _LastBlinkTime > interval) {
         _LastBlinkTime = currentTime;
         g_activeLedOn = !g_activeLedOn;
     }
 
-    if (_Mode == pd_Mode_ERROR) {
-        if (g_activeLedOn)
-            led_set(ALL_LEDS, ALL_LEDS);
-        else
-            led_set(ALL_LEDS, 0);
-    } else {
-        SetLeds();
-    }
-    */
+    SetLeds();
+    CheckForFinishedProvisionings();
 }
 
 static void RemoveClickerWithID(int clickerID) {

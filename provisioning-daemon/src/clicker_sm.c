@@ -58,7 +58,6 @@ static void HandleRemoteKeyNetworkCommand(int clickerId, uint8_t *data)
     PRINT_BYTES(clicker->remoteKey, clicker->remoteKeyLength);
 }
 
-
 static void GenerateSharedClickerKey(int clickerId)
 {
     Clicker *clicker = clicker_AcquireOwnership(clickerId);
@@ -130,6 +129,7 @@ void TryToSendPsk(int clickerId)
 
     clicker_ReleaseOwnership(clicker);
 }
+
 static bool NetworkCommandHandler(NetworkDataPack* netData)
 {
     switch (netData->command) {

@@ -76,27 +76,9 @@
  **************************************************************************************************/
 
 /**
- * Describes states provisioning daemon can be in.
- */
-typedef enum {
-    pd_Mode_LISTENING, // no provisioning being performed, in this state user can choose clicker to provision
-    pd_Mode_PROVISIONING, // provisioning has been started
-    pd_Mode_ERROR
-} pd_Mode;
-
-static bool _ModeChanged = false;
-
-/**
  * Main loop condition.
  */
 static volatile bool _KeepRunning = true;
-
-/**
- * Current app mode telling in which step of provisioning app currently  is.
- */
-static pd_Mode _Mode = pd_Mode_LISTENING;
-
-unsigned long _ModeErrorTime = 0;
 
 FILE * g_debugStream = NULL;
 int g_debugLevel = LOG_INFO;
@@ -115,10 +97,10 @@ pd_Config _PDConfig = {
 };
 
 sem_t debugSemapthore;
+
 /***************************************************************************************************
  * Implementation
  **************************************************************************************************/
-
 
 /**
  * @brief Handles Ctrl+C signal. Helps exit app gracefully.
@@ -395,20 +377,6 @@ int main(int argc, char **argv)
         }
         //-----------------
 
-        if (_Mode == pd_Mode_ERROR && loopStartTime - _ModeErrorTime > 5000)
-        {
-            _Mode = pd_Mode_LISTENING;
-            _ModeChanged = 1;
-        }
-
-        // disconnect already provisioned clicker after 3s timeout, timeout is important as if we disconnect clicker to early it may try to reconnect
-/*TODO: Perform disconnection after timeout
-        if (_SelectedClicker != NULL && _SelectedClicker->provisionTime > 0)
-        {
-            if (loopStartTime - _SelectedClicker->provisionTime > 3000)
-                con_Disconnect(_SelectedClicker->clickerID);
-        }
-*/
         unsigned long loopEndTime = GetCurrentTimeMillis();
         if (loopEndTime - loopStartTime < 50)
             usleep(1000*(50-(loopEndTime-loopStartTime)));
