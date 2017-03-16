@@ -72,7 +72,7 @@ void AddToHistory(int clickerId) {
     entry->timestamp = GetCurrentTimeMillis();
     entry->id = clickerId;
     entry->isErrored = false;
-    strncpy(entry->name, clicker->name, MAX_HISTORY_NAME - 1);
+    strlcpy(entry->name, clicker->name, MAX_HISTORY_NAME - 1);
 
     clicker_ReleaseOwnership(clicker);
 

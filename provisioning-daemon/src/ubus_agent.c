@@ -147,7 +147,7 @@ static int SetClickerNameMethodHandler(struct ubus_context *ctx, struct ubus_obj
     int size = strlen(clickerName);
     size = size > COMMAND_ENDPOINT_NAME_LENGTH ? COMMAND_ENDPOINT_NAME_LENGTH : size;
     clicker->name = g_malloc( size );
-    strncpy(clicker->name, clickerName, COMMAND_ENDPOINT_NAME_LENGTH);
+    strlcpy(clicker->name, clickerName, COMMAND_ENDPOINT_NAME_LENGTH);
 
     clicker_ReleaseOwnership(clicker);
 
@@ -301,11 +301,11 @@ static void GeneratePskResponseHandler(struct ubus_request *req, int type, struc
     PreSharedKey* eventData = g_new0(PreSharedKey, 1);
     eventData->clickerId = clickerId;
 
-    strncpy(eventData->identity, identity, PSK_ARRAYS_SIZE);
+    strlcpy(eventData->identity, identity, PSK_ARRAYS_SIZE);
     eventData->identityLen = strlen(identity);
     eventData->identityLen = eventData->identityLen > PSK_ARRAYS_SIZE ? PSK_ARRAYS_SIZE : eventData->identityLen;
 
-    strncpy(eventData->psk, psk, PSK_ARRAYS_SIZE);
+    strlcpy(eventData->psk, psk, PSK_ARRAYS_SIZE);
     eventData->pskLen = strlen(psk);
     eventData->pskLen = eventData->pskLen > PSK_ARRAYS_SIZE ? PSK_ARRAYS_SIZE : eventData->pskLen;
 

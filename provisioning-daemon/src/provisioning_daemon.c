@@ -35,7 +35,6 @@
 #include <bits/alltypes.h>
 #include <bits/signal.h>
 #include <libconfig.h>
-#include <semaphore.h>
 #include <signal.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -44,14 +43,13 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include "provisioning_daemon.h"
 #include "clicker.h"
 #include "clicker_sm.h"
 #include "commands.h"
 #include "connection_manager.h"
 #include "crypto/bigint.h"
 #include "crypto/crypto_config.h"
-#include "crypto/diffie_hellman_keys_exchanger.h"
-#include "crypto/encoder.h"
 #include "errors.h"
 #include "controls.h"
 #include "log.h"
@@ -64,11 +62,7 @@
  * Definitions
  **************************************************************************************************/
 
-/** Calculate size of array. */
-#define ARRAY_SIZE(x) ((sizeof x) / (sizeof *x))
-
 #define DEFAULT_PATH_CONFIG_FILE                "/etc/config/provisioning_daemon"
-
 
 #define CONFIG_BOOTSTRAP_URI                    "coaps://deviceserver.creatordev.io:15684"
 #define CONFIG_DEFUALT_TCP_PORT                 (49300)
@@ -81,8 +75,6 @@
  * Globals
  **************************************************************************************************/
 
-
-
 /**
  * Describes states provisioning daemon can be in.
  */
@@ -92,29 +84,12 @@ typedef enum {
     pd_Mode_ERROR
 } pd_Mode;
 
-typedef struct {
-    int tcpPort;
-    const char *defaultRouteUri;
-    const char *bootstrapUri;
-    const char *dnsServer;
-    const char *endPointNamePattern;
-    int logLevel;
-    int localProvisionControl;
-    int remoteProvisionControl;
-} pd_Config;
-
-
-/**
- * Currently selected clicker. NULL when there is no clicker selected.
- */
-static Clicker *_SelectedClicker = NULL;
-
 static bool _ModeChanged = false;
 
 /**
  * Main loop condition.
  */
-static short int _KeepRunning = 1;
+static volatile bool _KeepRunning = true;
 
 /**
  * Current app mode telling in which step of provisioning app currently  is.
@@ -125,10 +100,6 @@ unsigned long _ModeErrorTime = 0;
 
 FILE * g_debugStream = NULL;
 int g_debugLevel = LOG_INFO;
-
-
-static pd_DeviceServerConfig _DeviceServerConfig;
-static pd_NetworkConfig _NetworkConfig;
 
 static config_t _Cfg;
 
@@ -143,7 +114,6 @@ pd_Config _PDConfig = {
     .remoteProvisionControl = false
 };
 
-static sem_t semaphore;
 sem_t debugSemapthore;
 /***************************************************************************************************
  * Implementation
@@ -156,108 +126,7 @@ sem_t debugSemapthore;
 static void CtrlCHandler(int signal)
 {
     LOG(LOG_INFO, "Exit triggered...");
-    _KeepRunning = 0;
-}
-
-static void GenerateNameForClicker(int clickerId)
-{
-    char* ip = con_GetIPForClicker(clickerId);  //Note: we don't own this pointer, do not release!
-    if (ip == NULL) {
-        ip = "Unknown";
-    }
-    char hash[10];
-    GenerateClickerTimeHash(hash);
-    char ipFragment[5];
-    memset(ipFragment, 0, 5);
-    strncpy(ipFragment, ip + strlen(ip) - 4, 4);
-    Clicker* clicker = clicker_AcquireOwnership(clickerId);
-    if (clicker != NULL) {
-        GenerateClickerName(clicker->name, COMMAND_ENDPOINT_NAME_LENGTH, (char*)_PDConfig.endPointNamePattern, hash,
-                ipFragment);
-        LOG(LOG_INFO, "New clicker connected, ip : %s, id : %d, name : %s", ip, clicker->clickerID, clicker->name);
-        clicker_ReleaseOwnership(clicker);
-    }
-}
-
-void TryToSendPsk(int clickerId)
-{
-    Clicker *clicker = clicker_AcquireOwnership(clickerId);
-    if (clicker == NULL) {
-        LOG(LOG_ERR, "TryToSendPsk: Can't acquire clicker with id:%d, wont continue!", clickerId);
-        return;
-    }
-
-    if (clicker->sharedKey != NULL && clicker->psk != NULL)
-    {
-        memset(&_DeviceServerConfig, 0, sizeof(_DeviceServerConfig));
-        _DeviceServerConfig.securityMode = 0;
-
-        memcpy(_DeviceServerConfig.psk, clicker->psk, clicker->pskLen);
-        _DeviceServerConfig.pskKeySize = clicker->pskLen;
-
-        memcpy(_DeviceServerConfig.identity, clicker->identity, clicker->identityLen);
-        _DeviceServerConfig.identitySize = clicker->identityLen;
-
-        memcpy(_DeviceServerConfig.bootstrapUri, _PDConfig.bootstrapUri, strnlen(_PDConfig.bootstrapUri, 200));
-
-        uint8_t dataLen = 0;
-        uint8_t *encodedData = softap_encodeBytes((uint8_t *)&_DeviceServerConfig, sizeof(_DeviceServerConfig) ,
-                clicker->sharedKey, &dataLen);
-        NetworkDataPack* netData = con_BuildNetworkDataPack(clicker->clickerID, NetworkCommand_DEVICE_SERVER_CONFIG,
-                encodedData, dataLen, false);
-        event_PushEventWithPtr(EventType_CONNECTION_SEND_COMMAND, netData, true);
-        LOG(LOG_INFO, "Sending Device Server Config to clicker with id : %d", clicker->clickerID);
-
-        memset(&_NetworkConfig, 0, sizeof(_NetworkConfig));
-        memcpy(&_NetworkConfig.defaultRouteUri, _PDConfig.defaultRouteUri, strnlen(_PDConfig.defaultRouteUri, 100));
-        memcpy(&_NetworkConfig.dnsServer, _PDConfig.dnsServer, strnlen(_PDConfig.dnsServer, 100));
-        memcpy(&_NetworkConfig.endpointName, clicker->name, strnlen(clicker->name, 24));
-
-        dataLen = 0;
-        encodedData = softap_encodeBytes((uint8_t *)&_NetworkConfig, sizeof(_NetworkConfig) , clicker->sharedKey, &dataLen);
-        netData = con_BuildNetworkDataPack(clicker->clickerID, NetworkCommand_NETWORK_CONFIG, encodedData, dataLen, false);
-        event_PushEventWithPtr(EventType_CONNECTION_SEND_COMMAND, netData, true);
-        FREE_AND_NULL(encodedData);
-
-        LOG(LOG_INFO, "Sent Network Config to clicker with id : %d", clicker->clickerID);
-        LOG(LOG_INFO, "Provisioning of clicker with id : %d finished, going back to LISTENING mode", clicker->clickerID);
-        clicker->provisionTime = GetCurrentTimeMillis();
-        clicker->provisioningInProgress = false;
-    }
-
-    clicker_ReleaseOwnership(clicker);
-}
-
-bool pd_ConsumeEvent(Event* event) {
-    switch(event->type) {
-        case EventType_CLICKER_DESTROY:
-            if (_SelectedClicker->clickerID == event->intData)  //TODO: well probably this will crash :)
-                _SelectedClicker = NULL;
-            return true;
-
-        case EventType_CLICKER_CREATE:
-            GenerateNameForClicker(event->intData);
-            return true;
-
-        case EventType_TRY_TO_SEND_PSK_TO_CLICKER:
-            TryToSendPsk(event->intData);
-            return true;
-
-        default:
-            break;
-    }
-    return false;
-}
-
-int pd_GetSelectedClickerId(void)
-{
-    int result = -1;
-    sem_wait(&semaphore);
-    if (_SelectedClicker != NULL)
-        result = _SelectedClicker->clickerID;
-
-    sem_post(&semaphore);
-    return result;
+    _KeepRunning = false;
 }
 
 static bool ReadConfigFile(const char *filePath)
@@ -446,7 +315,6 @@ void CleanupOnExit(void)
     controls_shutdown();
 
     config_destroy(&_Cfg);
-    sem_destroy(&semaphore);
     sem_destroy(&debugSemapthore);
     history_destroy();
 }
@@ -477,13 +345,14 @@ int main(int argc, char **argv)
 
     g_debugLevel = _PDConfig.logLevel;
 
-    bi_generateConst();
+    struct sigaction action = { .sa_handler = CtrlCHandler, .sa_flags = 0 };
+    sigemptyset(&action.sa_mask);
+    sigaction(SIGINT, &action, NULL);
 
-    signal(SIGINT, CtrlCHandler);
-    sem_init(&semaphore, 0, 1);
+    srand(time(NULL));
+    bi_generateConst();
     history_init();
     controls_init(_PDConfig.localProvisionControl != 0);
-
     clicker_Init();
 
     if (ubusagent_Init() == false)
@@ -502,7 +371,7 @@ int main(int argc, char **argv)
     LOG(LOG_INFO, "Entering main loop");
     while(_KeepRunning)
     {
-        long long int loopStartTime = GetCurrentTimeMillis();
+        unsigned long loopStartTime = GetCurrentTimeMillis();
 
         con_ProcessConnections();
         controls_Update();
@@ -519,29 +388,12 @@ int main(int argc, char **argv)
             con_ConsumeEvent(event);
             clicker_ConsumeEvent(event);
             controls_ConsumeEvent(event);
-            pd_ConsumeEvent(event);
             clicker_sm_ConsumeEvent(event);
             history_ConsumeEvent(event);
 
             event_releaseEvent(&event);
         }
         //-----------------
-
-        // disconnect clickers with errors
-        // Clicker *clicker = clicker_GetClickers();
-        // while (clicker != NULL)
-        // {
-        //     if (clicker->error > 0)
-        //     {
-        //         _Mode = pd_Mode_ERROR;
-        //         _ModeErrorTime = GetCurrentTimeMillis();
-        //         LOG(LOG_INFO, "Disconnecting clicker with id : %d due to error : %d", clicker->clickerID, clicker->error);
-        //         con_Disconnect(clicker);
-        //         _ModeChanged = 1;
-        //     }
-        //     clicker = clicker->next;
-        // }
-
 
         if (_Mode == pd_Mode_ERROR && loopStartTime - _ModeErrorTime > 5000)
         {
@@ -550,13 +402,14 @@ int main(int argc, char **argv)
         }
 
         // disconnect already provisioned clicker after 3s timeout, timeout is important as if we disconnect clicker to early it may try to reconnect
+/*TODO: Perform disconnection after timeout
         if (_SelectedClicker != NULL && _SelectedClicker->provisionTime > 0)
         {
             if (loopStartTime - _SelectedClicker->provisionTime > 3000)
                 con_Disconnect(_SelectedClicker->clickerID);
         }
-
-        long long int loopEndTime = GetCurrentTimeMillis();
+*/
+        unsigned long loopEndTime = GetCurrentTimeMillis();
         if (loopEndTime - loopStartTime < 50)
             usleep(1000*(50-(loopEndTime-loopStartTime)));
     }

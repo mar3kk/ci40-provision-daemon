@@ -32,10 +32,12 @@
 #include "clicker_sm.h"
 #include "log.h"
 #include "crypto/crypto_config.h"
+#include "crypto/encoder.h"
 #include "ubus_agent.h"
 #include "connection_manager.h"
 #include "utils.h"
 #include "errors.h"
+#include "provisioning_daemon.h"
 
 static void HandleRemoteKeyNetworkCommand(int clickerId, uint8_t *data)
 {
@@ -77,6 +79,57 @@ static void GenerateSharedClickerKey(int clickerId)
     event_PushEventWithInt(EventType_TRY_TO_SEND_PSK_TO_CLICKER, clickerId);
 }
 
+void TryToSendPsk(int clickerId)
+{
+    Clicker *clicker = clicker_AcquireOwnership(clickerId);
+    if (clicker == NULL) {
+        LOG(LOG_ERR, "TryToSendPsk: Can't acquire clicker with id:%d, wont continue!", clickerId);
+        return;
+    }
+
+    if (clicker->sharedKey != NULL && clicker->psk != NULL)
+    {
+        pd_DeviceServerConfig _DeviceServerConfig;
+        pd_NetworkConfig _NetworkConfig;
+
+        memset(&_DeviceServerConfig, 0, sizeof(_DeviceServerConfig));
+        _DeviceServerConfig.securityMode = 0;
+
+        memcpy(_DeviceServerConfig.psk, clicker->psk, clicker->pskLen);
+        _DeviceServerConfig.pskKeySize = clicker->pskLen;
+
+        memcpy(_DeviceServerConfig.identity, clicker->identity, clicker->identityLen);
+        _DeviceServerConfig.identitySize = clicker->identityLen;
+
+        memcpy(_DeviceServerConfig.bootstrapUri, _PDConfig.bootstrapUri, strnlen(_PDConfig.bootstrapUri, 200));
+
+        uint8_t dataLen = 0;
+        uint8_t *encodedData = softap_encodeBytes((uint8_t *)&_DeviceServerConfig, sizeof(_DeviceServerConfig) ,
+                clicker->sharedKey, &dataLen);
+        NetworkDataPack* netData = con_BuildNetworkDataPack(clicker->clickerID, NetworkCommand_DEVICE_SERVER_CONFIG,
+                encodedData, dataLen, true);
+        event_PushEventWithPtr(EventType_CONNECTION_SEND_COMMAND, netData, true);
+        LOG(LOG_INFO, "Sending Device Server Config to clicker with id : %d", clicker->clickerID);
+
+        memset(&_NetworkConfig, 0, sizeof(_NetworkConfig));
+        strlcpy((char*)&_NetworkConfig.defaultRouteUri, _PDConfig.defaultRouteUri, sizeof(_NetworkConfig.defaultRouteUri));
+        strlcpy((char*)&_NetworkConfig.dnsServer, _PDConfig.dnsServer, sizeof(_NetworkConfig.dnsServer));
+        strlcpy((char*)&_NetworkConfig.endpointName, clicker->name, sizeof(_NetworkConfig.endpointName));
+
+        dataLen = 0;
+        encodedData = softap_encodeBytes((uint8_t *)&_NetworkConfig, sizeof(_NetworkConfig) , clicker->sharedKey, &dataLen);
+        netData = con_BuildNetworkDataPack(clicker->clickerID, NetworkCommand_NETWORK_CONFIG, encodedData, dataLen, true);
+        event_PushEventWithPtr(EventType_CONNECTION_SEND_COMMAND, netData, true);
+        G_FREE_AND_NULL(encodedData);
+
+        LOG(LOG_INFO, "Sent Network Config to clicker with id : %d", clicker->clickerID);
+        LOG(LOG_INFO, "Provisioning of clicker with id : %d finished, going back to LISTENING mode", clicker->clickerID);
+        clicker->provisionTime = GetCurrentTimeMillis();
+        clicker->provisioningInProgress = false;
+    }
+
+    clicker_ReleaseOwnership(clicker);
+}
 static bool NetworkCommandHandler(NetworkDataPack* netData)
 {
     switch (netData->command) {
@@ -137,12 +190,32 @@ static void ObtainedPSK(PreSharedKey* pskData) {
 
     clicker->identityLen = pskData->identityLen;
     clicker->identity = g_malloc(pskData->identityLen + 1);
-    strncpy((char*)clicker->identity, pskData->identity, pskData->identityLen);
+    strlcpy((char*)clicker->identity, pskData->identity, pskData->identityLen);
 
     clicker_ReleaseOwnership(clicker);
 
     event_PushEventWithInt(EventType_HISTORY_ADD, pskData->clickerId);
     event_PushEventWithInt(EventType_TRY_TO_SEND_PSK_TO_CLICKER, pskData->clickerId);
+}
+
+static void GenerateNameForClicker(int clickerId)
+{
+    char* ip = con_GetIPForClicker(clickerId);  //Note: we don't own this pointer, do not release!
+    if (ip == NULL) {
+        ip = "Unknown";
+    }
+    char hash[10];
+    GenerateClickerTimeHash(hash);
+    char ipFragment[5];
+    memset(ipFragment, 0, 5);
+    strlcpy(ipFragment, ip + strlen(ip) - 4, 4);
+    Clicker* clicker = clicker_AcquireOwnership(clickerId);
+    if (clicker != NULL) {
+        GenerateClickerName(clicker->name, COMMAND_ENDPOINT_NAME_LENGTH, (char*)_PDConfig.endPointNamePattern, hash,
+                ipFragment);
+        LOG(LOG_INFO, "New clicker connected, ip : %s, id : %d, name : %s", ip, clicker->clickerID, clicker->name);
+        clicker_ReleaseOwnership(clicker);
+    }
 }
 
 bool clicker_sm_ConsumeEvent(Event* event) {
@@ -151,6 +224,7 @@ bool clicker_sm_ConsumeEvent(Event* event) {
             return true;
 
         case EventType_CLICKER_CREATE:
+            GenerateNameForClicker(event->intData);
             GenerateLocalClickerKey(event->intData);
             return true;
 
@@ -165,7 +239,11 @@ bool clicker_sm_ConsumeEvent(Event* event) {
             ObtainedPSK((PreSharedKey*)event->ptrData);
             return true;
 
-        default:
+        case EventType_TRY_TO_SEND_PSK_TO_CLICKER:
+            TryToSendPsk(event->intData);
+            return true;
+
+       default:
             break;
     }
     return false;

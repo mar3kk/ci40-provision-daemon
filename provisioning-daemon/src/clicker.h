@@ -88,14 +88,6 @@ void clicker_Shutdown(void);
 Clicker *clicker_AcquireOwnership(int clickerID);
 
 /**
- * @brief Mark clicker with specified index as being used so it won't get purged until ownership is released.
- * @param[in] index of clicker
- * @return clicker or NULL if no clicker at specified index exists in the list of connected clickers
- */
-//TODO: remove this method, it shuldn't exist
-Clicker* clicker_AcquireOwnershipAtIndex(int index);
-
-/**
  * @brief Release ownership of clicker with specified ID so it can be purged.
  * @param[in] clicker clicker
  */

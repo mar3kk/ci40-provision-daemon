@@ -33,7 +33,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/time.h>
-
+#include "log.h"
 
 static const char chars[] = {
     '0', '1', '2', '3', '4', '5', '6', '7',
@@ -68,8 +68,13 @@ static int itoa(unsigned int num, char* str, int len, int base)
 unsigned long GetCurrentTimeMillis(void)
 {
     struct timeval _Timeval;
-    gettimeofday(&_Timeval, NULL);
-    return _Timeval.tv_sec * 1000 + _Timeval.tv_usec/1000;
+    unsigned long current_time_ms = 0;
+    if (gettimeofday(&_Timeval, NULL) == 0)
+        current_time_ms = _Timeval.tv_sec * 1000 + _Timeval.tv_usec / 1000;
+    else
+        LOG(LOG_ERR, "Failed to get current time.");
+
+    return current_time_ms;
 }
 
 void HexStringToByteArray(const char* hexstr, uint8_t * dst, size_t len)
@@ -81,13 +86,12 @@ void HexStringToByteArray(const char* hexstr, uint8_t * dst, size_t len)
 
 bool GenerateRandomX(unsigned char* array, int length)
 {
-    unsigned long seed = GetCurrentTimeMillis();
-    srand(seed);
+    if (array == NULL) return false;
 
     for (int i = 0; i < length; ++i)
         array[i] = rand() % 9;
 
-  return true;
+    return true;
 }
 
 void GenerateClickerTimeHash(char *buffer)

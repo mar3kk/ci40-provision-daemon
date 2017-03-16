@@ -100,10 +100,10 @@ void controls_init(bool enableButtons) {
 
     if (enableButtons) {
         LOG(LOG_INFO, "[Setup] Enabling button controls.");
-        int result = switch_init();
-        result += switch_add_callback(0x02, SelectNextClickerCallback);
-        result += switch_add_callback(0x04, StartProvisionCallback);
-        if (result != 0) {
+        bool result = switch_init() == 0;
+        result &= switch_add_callback(SWITCH_1_PRESSED, SelectNextClickerCallback) == 0;
+        result &= switch_add_callback(SWITCH_2_PRESSED, StartProvisionCallback) == 0;
+        if (result == false) {
             LOG(LOG_ERR, "[Setup] Problems while acquiring buttons, local provision control might not work.");
         }
     }
