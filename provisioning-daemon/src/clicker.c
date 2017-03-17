@@ -62,7 +62,6 @@ static void Destroy(Clicker *clicker) {
 static void ReleaseClickerIfNotOwned(Clicker* clicker) {
     //NOTE: Should be called in critical section only!
     if (clicker->ownershipsCount > 0) {
-        g_mutex_unlock(&mutex);
         return;
     }
     //check for logic error, if ownershipCount == 0, this clicker can't be in clickersQueue

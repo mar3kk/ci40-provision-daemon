@@ -306,7 +306,6 @@ void HandleSendCommandEvent(NetworkDataPack* data) {
     } else {
         SendCommand(connection, data->command);
     }
-    g_free(data);
 }
 
 bool con_ConsumeEvent(Event* event) {

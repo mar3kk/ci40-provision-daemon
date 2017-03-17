@@ -54,7 +54,7 @@ static int itoa(unsigned int num, char* str, int len, int base)
         return -1;
     do
     {
-        printf("i : %d , index : %d \n", i, sum%base);
+        //printf("i : %d , index : %d \n", i, sum%base);
         str[i++] = chars[sum%base];
 
         sum /= base;

@@ -153,16 +153,18 @@ void CheckForFinishedProvisionings(void) {
  */
 void controls_Update(void) {
     int clickerId = controls_GetSelectedClickerId();
+    int interval = 0;
+    if (clickerId >= 0) {
+        Clicker* clicker = clicker_AcquireOwnership(clickerId);
+        if (clicker == NULL) {
+            LOG(LOG_ERR, "No clicker with id:%d, this is internal error.", clickerId);
+            return;
+        }
 
-    Clicker* clicker = clicker_AcquireOwnership(clickerId);
-    if (clicker == NULL) {
-        LOG(LOG_ERR, "No clicker with id:%d, this is internal error.", clickerId);
-        return;
+        interval = clicker->provisioningInProgress ? LED_FAST_BLINK_INTERVAL_MS : LED_SLOW_BLINK_INTERVAL_MS;
+
+        clicker_ReleaseOwnership(clicker);
     }
-
-    int interval = clicker->provisioningInProgress ? LED_FAST_BLINK_INTERVAL_MS : LED_SLOW_BLINK_INTERVAL_MS;
-
-    clicker_ReleaseOwnership(clicker);
 
     unsigned long currentTime = GetCurrentTimeMillis();
     if (currentTime - _LastBlinkTime > interval) {

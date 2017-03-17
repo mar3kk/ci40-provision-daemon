@@ -125,6 +125,8 @@ void TryToSendPsk(int clickerId)
         LOG(LOG_INFO, "Provisioning of clicker with id : %d finished, going back to LISTENING mode", clicker->clickerID);
         clicker->provisionTime = GetCurrentTimeMillis();
         clicker->provisioningInProgress = false;
+    } else {
+        LOG(LOG_INFO, "TryToSendPsk: Can't send not all data avail, this is not error.");
     }
 
     clicker_ReleaseOwnership(clicker);

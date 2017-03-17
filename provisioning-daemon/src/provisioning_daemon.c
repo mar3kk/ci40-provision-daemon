@@ -343,6 +343,7 @@ int main(int argc, char **argv)
         CleanupOnExit();
         return -1;
     }
+
     if (_PDConfig.remoteProvisionControl)
     {
         LOG(LOG_INFO, "Enabling provision control through uBus.");

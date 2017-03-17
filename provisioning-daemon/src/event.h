@@ -48,6 +48,7 @@ typedef enum {
 } EventType;
 
 typedef struct {
+    int id;
     EventType type;
     union {
         int     intData;
