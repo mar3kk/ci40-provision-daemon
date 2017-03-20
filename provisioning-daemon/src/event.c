@@ -28,9 +28,6 @@
  * WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #include "event.h"
-#include "log.h"
-
-//https://www.ibm.com/developerworks/linux/tutorials/l-glib/
 
 static GQueue* eventsQueue = NULL;
 static GMutex mutex;
@@ -95,7 +92,7 @@ void event_PushEventWithInt(EventType type, int data) {
     event->freeDataPtrOnRelease = false;
     g_queue_push_tail(eventsQueue, event);
     g_mutex_unlock(&mutex);
-    LOG(LOG_INFO, "[Event:%d] eventPtr:%p type:%s, int data:%d", event->id, event, EventTypeToString(type), data);
+    g_message("[Event:%d] eventPtr:%p type:%s, int data:%d", event->id, event, EventTypeToString(type), data);
 }
 
 void event_PushEventWithPtr(EventType type, void* dataPtr, bool freeDataOnRelease) {
@@ -109,7 +106,7 @@ void event_PushEventWithPtr(EventType type, void* dataPtr, bool freeDataOnReleas
     g_queue_push_tail(eventsQueue, event);
     g_mutex_unlock(&mutex);
 
-    LOG(LOG_INFO, "[Event:%d] eventPtr:%p, type:%s, dataPtr:%p", event->id, event, EventTypeToString(type), dataPtr);
+    g_message("[Event:%d] eventPtr:%p, type:%s, dataPtr:%p", event->id, event, EventTypeToString(type), dataPtr);
 }
 
 Event* event_PopEvent(void) {
@@ -122,10 +119,10 @@ Event* event_PopEvent(void) {
 void event_releaseEvent(Event** event) {
     if (*event != NULL) {
         if ((*event)->freeDataPtrOnRelease) {
-            LOG(LOG_DBG, "[event:%d] release event DATA ptr: %p", (*event)->id, (*event)->ptrData);
+            g_debug("[event:%d] release event DATA ptr: %p", (*event)->id, (*event)->ptrData);
             g_free((*event)->ptrData);
         }
-        LOG(LOG_DBG, "[event:%d] release event %s ptr: %p", (*event)->id, EventTypeToString((*event)->type), *event);
+        g_debug("[event:%d] release event %s ptr: %p", (*event)->id, EventTypeToString((*event)->type), *event);
         g_free(*event);
         *event = NULL;
     }

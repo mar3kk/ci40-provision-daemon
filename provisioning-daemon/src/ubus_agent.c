@@ -32,7 +32,6 @@
 #include <sys/prctl.h>
 #include <glib.h>
 
-#include "log.h"
 #include "clicker.h"
 #include "controls.h"
 #include "provision_history.h"
@@ -127,7 +126,7 @@ static const struct blobmsg_policy _GeneratePskResponsePolicy[GENERATE_PSK_RESPO
 static int SetClickerNameMethodHandler(struct ubus_context *ctx, struct ubus_object *obj, struct ubus_request_data *req,
         const char *method, struct blob_attr *msg) {
 
-    LOG(LOG_DBG, "uBusAgent: Requested SetClickerName");
+    g_debug("uBusAgent: Requested SetClickerName");
 
     struct blob_attr *args[SET_CLICKER_NAME_LAST];
 
@@ -137,7 +136,7 @@ static int SetClickerNameMethodHandler(struct ubus_context *ctx, struct ubus_obj
 
     Clicker *clicker = clicker_AcquireOwnership(clickerID);
     if (clicker == NULL) {
-        LOG(LOG_ERR, "uBusAgent: No clicker with id %d", clickerID);
+        g_critical("uBusAgent: No clicker with id %d", clickerID);
         return 1;
     }
 
@@ -166,7 +165,7 @@ static int SelectMethodHandler(struct ubus_context *ctx, struct ubus_object *obj
     if (argBuffer[SELECT_CLICKER_ID])
         clickerId = blobmsg_get_u32(argBuffer[SELECT_CLICKER_ID]);
 
-    LOG(LOG_DBG, "uBusAgent: Select, move to clickerId:%d", clickerId);
+    g_debug("uBusAgent: Select, move to clickerId:%d", clickerId);
 
     event_PushEventWithInt(EventType_CLICKER_SELECT, clickerId);
 
@@ -176,7 +175,7 @@ static int SelectMethodHandler(struct ubus_context *ctx, struct ubus_object *obj
 static int StartProvisionMethodHandler(struct ubus_context *ctx, struct ubus_object *obj, struct ubus_request_data *req,
         const char *method, struct blob_attr *msg)
 {
-    LOG(LOG_DBG, "uBusAgent: Requested StartProvision");
+    g_debug("uBusAgent: Requested StartProvision");
 
     //TODO: web page can be upgraded to send clickeID, this allow to provision any visible clicker not only selected
     int clickerId = controls_GetSelectedClickerId();
@@ -188,11 +187,11 @@ static int StartProvisionMethodHandler(struct ubus_context *ctx, struct ubus_obj
 static int GetStateMethodHandler(struct ubus_context *ctx, struct ubus_object *obj, struct ubus_request_data *req,
         const char *method, struct blob_attr *msg)
 {
-    LOG(LOG_DBG, "uBusAgent: Requested GetState");
+    g_debug("uBusAgent: Requested GetState");
 
     GArray* connectedClickers = controls_GetAllClickersIds();
     int selClickerId = controls_GetSelectedClickerId();
-    LOG(LOG_DBG, "uBusAgent: GetState clicker count:%d, selected id:%d", connectedClickers->len, selClickerId);
+    g_debug("uBusAgent: GetState clicker count:%d, selected id:%d", connectedClickers->len, selClickerId);
 
     //add history data
     GArray* historyItems = history_GetProvisioned();
@@ -268,7 +267,7 @@ static void GeneratePskResponseHandler(struct ubus_request *req, int type, struc
     char *error = blobmsg_get_string(args[GENERATE_PSK_RESPONSE_ERROR]);
     if (error)
     {
-        LOG(LOG_ERR, "uBusAgent: Error while generating PSK : %s", error);
+        g_critical("uBusAgent: Error while generating PSK : %s", error);
         PreSharedKey* eventData = g_new0(PreSharedKey, 1);
         eventData->clickerId = clickerId;
         event_PushEventWithPtr(EventType_PSK_OBTAINED, eventData, true);
@@ -279,7 +278,7 @@ static void GeneratePskResponseHandler(struct ubus_request *req, int type, struc
 
     if (!psk)
     {
-        LOG(LOG_ERR, "uBusAgent: UNKNOWN PSK");
+        g_critical("uBusAgent: UNKNOWN PSK");
         PreSharedKey* eventData = g_new0(PreSharedKey, 1);
         eventData->clickerId = clickerId;
         event_PushEventWithPtr(EventType_PSK_OBTAINED, eventData, true);
@@ -289,14 +288,14 @@ static void GeneratePskResponseHandler(struct ubus_request *req, int type, struc
     char *identity = blobmsg_get_string(args[GENERATE_PSK_RESPONSE_PSK_IDENTITY]);
     if (!identity)
     {
-        LOG(LOG_ERR, "uBusAgent: UNKNOWN PSK");
+        g_critical("uBusAgent: UNKNOWN PSK");
         PreSharedKey* eventData = g_new0(PreSharedKey, 1);
         eventData->clickerId = clickerId;
         event_PushEventWithPtr(EventType_PSK_OBTAINED, eventData, true);
         return;
     }
 
-    LOG(LOG_INFO, "uBusAgent: Obtained PSK: %s and IDENTITY: %s", psk, identity);
+    g_message("uBusAgent: Obtained PSK: %s and IDENTITY: %s", psk, identity);
 
     PreSharedKey* eventData = g_new0(PreSharedKey, 1);
     eventData->clickerId = clickerId;
@@ -324,7 +323,7 @@ void HelperTimeoutHandler(struct uloop_timeout *t)
 
 static void* PDUbusLoop(void *arg)
 {
-    LOG(LOG_INFO, "uBusAgent: uBus thread started.\n");
+    g_message("uBusAgent: uBus thread started.\n");
     while(true)
     {
         sem_wait(&semaphore);
@@ -337,7 +336,7 @@ static void* PDUbusLoop(void *arg)
         while(uBusInterruption)
         {
             uBusInInterState = true;
-            LOG(LOG_INFO, "Interrupt state");
+            g_message("Interrupt state");
             sem_post(&semaphore);
             usleep(1000 * 1000);
             sem_wait(&semaphore);
@@ -346,7 +345,7 @@ static void* PDUbusLoop(void *arg)
         sem_post(&semaphore);
         uloop_run();
     }
-    LOG(LOG_INFO, "uBusAgent: uBus thread finish.\n");
+    g_message("uBusAgent: uBus thread finish.\n");
     return NULL;
 }
 
@@ -386,7 +385,7 @@ bool ubusagent_Init(void)
     _UbusCTX = ubus_connect(_Path);
     if (!_UbusCTX)
     {
-        LOG(LOG_ERR, "uBusAgent: Failed to connect to ubus");
+        g_critical("uBusAgent: Failed to connect to ubus");
         return false;
     }
     ubus_add_uloop(_UbusCTX);
@@ -401,7 +400,7 @@ bool ubusagent_Init(void)
 
     if (pthread_create(&_UbusThread, NULL, PDUbusLoop, NULL) < 0)
     {
-        LOG(LOG_ERR, "uBusAgent: Error creating thread.");
+        g_critical("uBusAgent: Error creating thread.");
         return false;
     }
     return true;
@@ -411,10 +410,10 @@ bool ubusagent_EnableRemoteControl(void)
 {
     SetUBusLoopInterruption(true);
     WaitForInterruptState();
-    LOG(LOG_INFO, "uBusAgent: Enabling provision control through uBus");
+    g_message("uBusAgent: Enabling provision control through uBus");
     int ret = ubus_add_object(_UbusCTX, &_UBusAgentObject);
     if (ret)
-        LOG(LOG_ERR, "uBusAgent: Failed to add object: %s\n", ubus_strerror(ret));
+        g_critical("uBusAgent: Failed to add object: %s\n", ubus_strerror(ret));
 
     SetUBusLoopInterruption(false);
 
@@ -442,14 +441,14 @@ bool ubusagent_SendGeneratePskMessage(int clickerId)
     ret = ubus_lookup_id(_UbusCTX, "creator", &id);
     if (ret)
     {
-        LOG(LOG_ERR, "uBusAgent: creator ubus service not available");
+        g_critical("uBusAgent: creator ubus service not available");
         return false;
     }
 
     ret = ubus_invoke(_UbusCTX, id, "generatePsk", replyBloob.head, GeneratePskResponseHandler, (void*)clickerId, 10000);
     if (ret)
     {
-        LOG(LOG_ERR, "uBusAgent: Filed to invoke generatePsk");
+        g_critical("uBusAgent: Filed to invoke generatePsk");
         return false;
     }
     blob_buf_free(&replyBloob);

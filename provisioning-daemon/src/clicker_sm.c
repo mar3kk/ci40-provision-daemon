@@ -30,7 +30,6 @@
 
 #include <unistd.h>
 #include "clicker_sm.h"
-#include "log.h"
 #include "crypto/crypto_config.h"
 #include "crypto/encoder.h"
 #include "ubus_agent.h"
@@ -43,7 +42,7 @@ static void HandleRemoteKeyNetworkCommand(int clickerId, uint8_t *data)
 {
     Clicker *clicker = clicker_AcquireOwnership(clickerId);
     if (clicker == NULL) {
-        LOG(LOG_ERR, "HandleRemoteKeyNetworkCommand: Can't acquire clicker with id:%d, this is probably internal error",
+        g_critical( "HandleRemoteKeyNetworkCommand: Can't acquire clicker with id:%d, this is probably internal error",
                 clickerId);
         return;
     }
@@ -54,7 +53,7 @@ static void HandleRemoteKeyNetworkCommand(int clickerId, uint8_t *data)
     memcpy(clicker->remoteKey, &data[1], dataLength);
     clicker_ReleaseOwnership(clicker);
 
-    LOG(LOG_INFO, "Received exchange key from clicker : %d", clicker->clickerID);
+    g_message("Received exchange key from clicker : %d", clicker->clickerID);
     PRINT_BYTES(clicker->remoteKey, clicker->remoteKeyLength);
 }
 
@@ -62,7 +61,7 @@ static void GenerateSharedClickerKey(int clickerId)
 {
     Clicker *clicker = clicker_AcquireOwnership(clickerId);
     if (clicker == NULL) {
-        LOG(LOG_ERR, "GenerateSharedClickerKey: Can't acquire clicker with id:%d, this is probably internal error",
+        g_critical( "GenerateSharedClickerKey: Can't acquire clicker with id:%d, this is probably internal error",
                 clickerId);
         return;
     }
@@ -70,7 +69,7 @@ static void GenerateSharedClickerKey(int clickerId)
     clicker->sharedKey = dh_completeExchangeData(clicker->keysExchanger, clicker->remoteKey, clicker->remoteKeyLength);
     clicker->sharedKeyLength = clicker->keysExchanger->pModuleLength;
 
-    LOG(LOG_INFO, "Generated Shared Key");
+    g_message("Generated Shared Key");
     PRINT_BYTES(clicker->sharedKey, clicker->sharedKeyLength);
 
     clicker_ReleaseOwnership(clicker);
@@ -82,7 +81,7 @@ void TryToSendPsk(int clickerId)
 {
     Clicker *clicker = clicker_AcquireOwnership(clickerId);
     if (clicker == NULL) {
-        LOG(LOG_ERR, "TryToSendPsk: Can't acquire clicker with id:%d, wont continue!", clickerId);
+        g_critical( "TryToSendPsk: Can't acquire clicker with id:%d, wont continue!", clickerId);
         return;
     }
 
@@ -108,7 +107,7 @@ void TryToSendPsk(int clickerId)
         NetworkDataPack* netData = con_BuildNetworkDataPack(clicker->clickerID, NetworkCommand_DEVICE_SERVER_CONFIG,
                 encodedData, dataLen, true);
         event_PushEventWithPtr(EventType_CONNECTION_SEND_COMMAND, netData, true);
-        LOG(LOG_INFO, "Sending Device Server Config to clicker with id : %d", clicker->clickerID);
+        g_message("Sending Device Server Config to clicker with id : %d", clicker->clickerID);
 
         memset(&_NetworkConfig, 0, sizeof(_NetworkConfig));
         strlcpy((char*)&_NetworkConfig.defaultRouteUri, _PDConfig.defaultRouteUri, sizeof(_NetworkConfig.defaultRouteUri));
@@ -121,12 +120,12 @@ void TryToSendPsk(int clickerId)
         event_PushEventWithPtr(EventType_CONNECTION_SEND_COMMAND, netData, true);
         G_FREE_AND_NULL(encodedData);
 
-        LOG(LOG_INFO, "Sent Network Config to clicker with id : %d", clicker->clickerID);
-        LOG(LOG_INFO, "Provisioning of clicker with id : %d finished, going back to LISTENING mode", clicker->clickerID);
+        g_message("Sent Network Config to clicker with id : %d", clicker->clickerID);
+        g_message("Provisioning of clicker with id : %d finished, going back to LISTENING mode", clicker->clickerID);
         clicker->provisionTime = GetCurrentTimeMillis();
         clicker->provisioningInProgress = false;
     } else {
-        LOG(LOG_INFO, "TryToSendPsk: Can't send not all data avail, this is not error.");
+        g_message("TryToSendPsk: Can't send not all data avail, this is not error.");
     }
 
     clicker_ReleaseOwnership(clicker);
@@ -136,7 +135,7 @@ static bool NetworkCommandHandler(NetworkDataPack* netData)
 {
     switch (netData->command) {
         case NetworkCommand_KEY:
-            LOG(LOG_DBG, "Received KEY command");
+            g_debug("Received KEY command");
             HandleRemoteKeyNetworkCommand(netData->clickerID, netData->data);
             GenerateSharedClickerKey(netData->clickerID);
             break;
@@ -150,7 +149,7 @@ static bool NetworkCommandHandler(NetworkDataPack* netData)
 void GenerateLocalClickerKey(int clickerId) {
     Clicker *clicker = clicker_AcquireOwnership(clickerId);
     if (clicker == NULL) {
-        LOG(LOG_ERR, "GenerateLocalClickerKey: Can't acquire clicker with id:%d, this is probably internal error",
+        g_critical( "GenerateLocalClickerKey: Can't acquire clicker with id:%d, this is probably internal error",
                 clickerId);
         return;
     }
@@ -158,9 +157,9 @@ void GenerateLocalClickerKey(int clickerId) {
     clicker->localKey = (void*) dh_generateExchangeData(keysExchanger);
     clicker->localKeyLength = keysExchanger->pModuleLength;
 
-    LOG(LOG_INFO, "Generated local Key");
+    g_message("Generated local Key");
     PRINT_BYTES(clicker->localKey, clicker->localKeyLength);
-    LOG(LOG_INFO, "Sending local Key to clicker with id : %d", clickerId);
+    g_message("Sending local Key to clicker with id : %d", clickerId);
 
     NetworkDataPack* netData = con_BuildNetworkDataPack(clickerId, NetworkCommand_KEY, clicker->localKey,
             clicker->localKeyLength, true);
@@ -173,13 +172,13 @@ static void ObtainedPSK(PreSharedKey* pskData) {
 
     Clicker *clicker = clicker_AcquireOwnership(pskData->clickerId);
     if (clicker == NULL) {
-        LOG(LOG_ERR, "ObtainedPSK: Can't acquire clicker with id:%d, this is probably internal error",
+        g_critical("ObtainedPSK: Can't acquire clicker with id:%d, this is probably internal error",
                 pskData->clickerId);
         return;
     }
 
     if (pskData->psk == NULL) {
-        LOG(LOG_WARN, "Couldn't get PSK from Device Server");
+        g_warning("Couldn't get PSK from Device Server");
         clicker->error = pd_Error_GENERATE_PSK;
         clicker->provisioningInProgress = false;
         clicker_ReleaseOwnership(clicker);
@@ -215,7 +214,7 @@ static void GenerateNameForClicker(int clickerId)
     if (clicker != NULL) {
         GenerateClickerName(clicker->name, COMMAND_ENDPOINT_NAME_LENGTH, (char*)_PDConfig.endPointNamePattern, hash,
                 ipFragment);
-        LOG(LOG_INFO, "New clicker connected, ip:[%s], id: %d, name:'%s'", ip, clicker->clickerID, clicker->name);
+        g_message("New clicker connected, ip:[%s], id: %d, name:'%s'", ip, clicker->clickerID, clicker->name);
         clicker_ReleaseOwnership(clicker);
     }
 }

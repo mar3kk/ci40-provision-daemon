@@ -33,7 +33,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/time.h>
-#include "log.h"
+#include <glib.h>
 
 static const char chars[] = {
     '0', '1', '2', '3', '4', '5', '6', '7',
@@ -72,7 +72,7 @@ unsigned long GetCurrentTimeMillis(void)
     if (gettimeofday(&_Timeval, NULL) == 0)
         current_time_ms = _Timeval.tv_sec * 1000 + _Timeval.tv_usec / 1000;
     else
-        LOG(LOG_ERR, "Failed to get current time.");
+        g_critical("Failed to get current time.");
 
     return current_time_ms;
 }

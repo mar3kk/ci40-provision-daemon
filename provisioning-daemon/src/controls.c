@@ -30,7 +30,6 @@
 
 #include "controls.h"
 #include "utils.h"
-#include "log.h"
 #include "connection_manager.h"
 #include <letmecreate/letmecreate.h>
 #include <glib.h>
@@ -69,7 +68,7 @@ static void SelectNextClickerCallback(void)
     if (selectedClickerIndex >= _connectedClickersId->len) {
         selectedClickerIndex = _connectedClickersId->len - 1;
     }
-    LOG(LOG_INFO, "Selected Clicker ID : %d", g_array_index(_connectedClickersId, int, selectedClickerIndex));
+    g_message( "Selected Clicker ID : %d", g_array_index(_connectedClickersId, int, selectedClickerIndex));
     g_mutex_unlock(&mutex);
     UpdateHighlights();
 }
@@ -77,7 +76,7 @@ static void SelectNextClickerCallback(void)
 static void StartProvisionCallback(void)
 {
     if (selectedClickerIndex < 0 || _connectedClickersId->len == 0) {
-        LOG(LOG_ERR, "Can't start provision, no clicker is selected!");
+        g_critical( "Can't start provision, no clicker is selected!");
         return;
     }
     g_mutex_lock(&mutex);
@@ -86,7 +85,7 @@ static void StartProvisionCallback(void)
 
     Clicker* clicker = clicker_AcquireOwnership(clickerId);
     if (clicker == NULL) {
-        LOG(LOG_ERR, "No clicker with id:%d, this is internal error.", clickerId);
+        g_critical( "No clicker with id:%d, this is internal error.", clickerId);
         return;
     }
     clicker->provisioningInProgress = true;
@@ -101,12 +100,12 @@ void controls_init(bool enableButtons) {
     _connectedClickersId = g_array_new(FALSE, FALSE, sizeof(int));
 
     if (enableButtons) {
-        LOG(LOG_INFO, "[Setup] Enabling button controls.");
+        g_message( "[Setup] Enabling button controls.");
         bool result = switch_init() == 0;
         result &= switch_add_callback(SWITCH_1_PRESSED, SelectNextClickerCallback) == 0;
         result &= switch_add_callback(SWITCH_2_PRESSED, StartProvisionCallback) == 0;
         if (result == false) {
-            LOG(LOG_ERR, "[Setup] Problems while acquiring buttons, local provision control might not work.");
+            g_critical( "[Setup] Problems while acquiring buttons, local provision control might not work.");
         }
     }
 }
@@ -156,7 +155,7 @@ void CheckForFinishedProvisionings(void) {
         g_mutex_unlock(&mutex);
         Clicker* clicker = clicker_AcquireOwnership(clickerId);
         if (clicker == NULL) {
-            LOG(LOG_ERR, "No clicker with id:%d, this is internal error.", clickerId);
+            g_critical( "No clicker with id:%d, this is internal error.", clickerId);
             continue;
         }
         if (clicker->provisionTime > 0) {
@@ -177,7 +176,7 @@ void controls_Update(void) {
     if (clickerId >= 0) {
         Clicker* clicker = clicker_AcquireOwnership(clickerId);
         if (clicker == NULL) {
-            LOG(LOG_ERR, "No clicker with id:%d, this is internal error.", clickerId);
+            g_critical( "No clicker with id:%d, this is internal error.", clickerId);
             return;
         }
 
@@ -210,7 +209,7 @@ static void RemoveClickerWithID(int clickerID) {
 
         if (selectedClickerIndex >= _connectedClickersId->len) {
             selectedClickerIndex = _connectedClickersId->len - 1;
-            LOG(LOG_INFO, "Selected Clicker ID : %d", g_array_index(_connectedClickersId, int, selectedClickerIndex));
+            g_message( "Selected Clicker ID : %d", g_array_index(_connectedClickersId, int, selectedClickerIndex));
         }
     }
     g_mutex_unlock(&mutex);
@@ -221,7 +220,7 @@ static void SelectClickerWithId(int clickerId) {
     for (guint t = 0; t < _connectedClickersId->len; t++) {
         if (g_array_index(_connectedClickersId, int, t) == clickerId) {
             selectedClickerIndex = t;
-            LOG(LOG_INFO, "Selected Clicker ID : %d", clickerId);
+            g_message( "Selected Clicker ID : %d", clickerId);
             break;
         }
     }
@@ -251,7 +250,7 @@ bool controls_ConsumeEvent(Event* event) {
             g_array_append_val(_connectedClickersId, event->intData);
             if (selectedClickerIndex == -1) {
                 selectedClickerIndex = 0;
-                LOG(LOG_INFO, "Selected Clicker ID : %d", g_array_index(_connectedClickersId, int, selectedClickerIndex));
+                g_message( "Selected Clicker ID : %d", g_array_index(_connectedClickersId, int, selectedClickerIndex));
             }
             g_mutex_unlock(&mutex);
             UpdateHighlights();

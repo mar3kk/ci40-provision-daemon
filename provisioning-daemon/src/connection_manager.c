@@ -29,11 +29,9 @@
  */
 
 #include "connection_manager.h"
-#include "log.h"
 #include "utils.h"
 #include "clicker.h"
 #include "provision_history.h"
-
 #include <unistd.h>
 #include <errno.h>
 #include <sys/ioctl.h>
@@ -69,7 +67,7 @@ void ConnectionDataToString(ConnectionData* connection, char* buf, size_t bufLen
 static void HandleDisconnect(ConnectionData* connection) {
     char buf[1024];
     ConnectionDataToString(connection, buf, sizeof(buf));
-    LOG(LOG_INFO, "Clicker disconnected, %s\n", buf);
+    g_message("Clicker disconnected, %s\n", buf);
     close(connection->socket);
 
     event_PushEventWithInt(EventType_CLICKER_DESTROY, connection->clickerID);
@@ -84,7 +82,7 @@ static void AcceptConnection() {
     socklen_t addrLen;
 
     if ((newSocket = accept(_MasterSocket, (struct sockaddr *) &address, &addrLen)) < 0) {
-        LOG(LOG_ERR, "Error accepting connection. Errno: %d \n", errno);
+        g_critical("Error accepting connection. Errno: %d \n", errno);
         return;
     }
 
@@ -98,7 +96,7 @@ static void AcceptConnection() {
 
     memset(connection->ip, 0, sizeof(connection->ip));
     if (inet_ntop(AF_INET6, &address.sin6_addr, connection->ip, INET6_ADDRSTRLEN) < 0) {
-        LOG(LOG_ERR, "Failed to convert ipv6 address to string of clicker id: %d", connection->clickerID);
+        g_critical("Failed to convert ipv6 address to string of clicker id: %d", connection->clickerID);
         strlcpy(connection->ip, "::1", INET6_ADDRSTRLEN);
     }
 
@@ -108,14 +106,14 @@ static void AcceptConnection() {
 
     char buf[1024];
     ConnectionDataToString(connection, buf, sizeof(buf));
-    LOG(LOG_INFO, "New clicker connected: %s\n", buf);
+    g_message("New clicker connected: %s\n", buf);
 }
 
 static void HandleReceivedData(ConnectionData* connection, uint8_t* buffer, size_t dataLen) {
     NetworkCommand cmd = buffer[0];
     if (cmd == NetworkCommand_KEEP_ALIVE) {
         connection->lastKeepAliveTime = GetCurrentTimeMillis();
-        LOG(LOG_DBG, "Got keepalive response for clicker:%d", connection->clickerID);
+        g_debug("Got keepalive response for clicker:%d", connection->clickerID);
 
     } else {
         dataLen--; //skip info about command (1 byte)
@@ -137,7 +135,7 @@ static int HandleRead(fd_set* readFS) {
         memset(buffer, 0, sizeof(buffer));
         if (FD_ISSET(socket, readFS)) {
             if ((valread = read(socket, buffer, 1024)) == 0) {
-                LOG(LOG_DBG, "Read error. Disconnecting");
+                g_debug("Read error. Disconnecting");
                 HandleDisconnect(connection);
             } else {
                 HandleReceivedData(connection, buffer, valread);
@@ -156,12 +154,12 @@ int con_BindAndListen(int tcpPort) {
     _MasterSocket = socket(AF_INET6, SOCK_STREAM, 0);
     if (_MasterSocket == -1) {
         int err = errno;
-        LOG(LOG_ERR, "Error opening socket. ERRNO: %d \n", err);
+        g_critical("Error opening socket. ERRNO: %d \n", err);
         return -1;
     }
 
     if (setsockopt(_MasterSocket, SOL_SOCKET, SO_REUSEADDR, &reuse_addr, sizeof(reuse_addr)) < 0) {
-        LOG(LOG_ERR, "Failed to set socket option");
+        g_critical("Failed to set socket option");
         return -1;
     }
 
@@ -171,7 +169,7 @@ int con_BindAndListen(int tcpPort) {
     address.sin6_addr = in6addr_any;
 
     if (bind(_MasterSocket, (struct sockaddr *) &address, sizeof(address)) == -1) {
-        LOG(LOG_ERR, "Error binding socket. ERRNO: %d \n", errno);
+        g_critical("Error binding socket. ERRNO: %d \n", errno);
         return -1;
     }
 
@@ -181,7 +179,7 @@ int con_BindAndListen(int tcpPort) {
 
 static void SendCommand(ConnectionData* connection, NetworkCommand command) {
     if (connection == NULL) {
-        LOG(LOG_WARN, "SendCommandWithData: No connection.");
+        g_warning("SendCommandWithData: No connection.");
         return;
     }
     char buffer[2];
@@ -191,11 +189,11 @@ static void SendCommand(ConnectionData* connection, NetworkCommand command) {
 
 static void SendCommandWithData(ConnectionData* connection, NetworkCommand command, uint8_t *data, uint8_t dataLength) {
     if (data == NULL || dataLength == 0) {
-        LOG(LOG_WARN, "SendCommandWithData: Tried to send command with no needed data.");
+        g_warning("SendCommandWithData: Tried to send command with no needed data.");
         return;
     }
     if (connection == NULL) {
-        LOG(LOG_WARN, "SendCommandWithData: No connection.");
+        g_warning("SendCommandWithData: No connection.");
         return;
     }
     uint8_t buffer[dataLength + 2];
@@ -253,7 +251,7 @@ void con_ProcessConnections(void) {
     activity = select(maxSD + 1, &readFS, NULL, NULL, &selectTimeout);
 
     if (activity < 0) {
-        LOG(LOG_ERR, "select error. Errno: %d", errno);
+        g_critical("select error. Errno: %d", errno);
         return;
     }
 
@@ -289,13 +287,13 @@ void con_Disconnect(int clickerID) {
 void HandleSendCommandEvent(NetworkDataPack* data) {
     ConnectionData* connection = ConnectionForClickerId(data->clickerID);
     if (connection == NULL) {
-        LOG(LOG_ERR, "Can't send data to clicker %d, connection not found! Command to send: %d", data->clickerID,
+        g_critical("Can't send data to clicker %d, connection not found! Command to send: %d", data->clickerID,
                 data->command);
         return;
     }
     if (data->data != NULL && data->dataSize != 0) {
         if (data->dataSize > 255) {
-            LOG(LOG_ERR, "Data size to send is to big, clickerId:%d, command:%d, size:%d", data->clickerID,
+            g_critical("Data size to send is to big, clickerId:%d, command:%d, size:%d", data->clickerID,
                     data->command, data->dataSize);
         }
         SendCommandWithData(connection, data->command, data->data, (uint8_t) data->dataSize);

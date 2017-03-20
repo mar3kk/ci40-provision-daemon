@@ -36,7 +36,6 @@
 #include <glib.h>
 
 #include "provision_history.h"
-#include "log.h"
 #include "clicker.h"
 #include "utils.h"
 
@@ -64,7 +63,7 @@ void history_destroy(void) {
 void AddToHistory(int clickerId) {
     Clicker *clicker = clicker_AcquireOwnership(clickerId);
     if (clicker == NULL) {
-        LOG(LOG_ERR, "AddToHistory: Can't acquire clicker with id:%d, this is probably internal error", clickerId);
+        g_critical("AddToHistory: Can't acquire clicker with id:%d, this is probably internal error", clickerId);
         return;
     }
 

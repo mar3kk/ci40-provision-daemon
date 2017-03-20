@@ -30,7 +30,6 @@
 
 #include "clicker.h"
 #include "utils.h"
-#include "log.h"
 #include "commands.h"
 #include "crypto/crypto_config.h"
 #include <stdlib.h>
@@ -66,7 +65,7 @@ static void ReleaseClickerIfNotOwned(Clicker* clicker) {
     }
     //check for logic error, if ownershipCount == 0, this clicker can't be in clickersQueue
     if (g_queue_remove(clickersQueue, clicker) == TRUE) {
-        LOG(LOG_ERR, "Internal error: Clicker with id:%d has ownershipCount = 0, but it's still in queue! Forced remove",
+        g_critical("Internal error: Clicker with id:%d has ownershipCount = 0, but it's still in queue! Forced remove",
                 clicker->clickerID);
     }
     Destroy(clicker);
@@ -126,13 +125,13 @@ void RemoveFromCollection(int clickerID)
     if (clicker == NULL) {
         return;
     }
-    LOG(LOG_DBG, "clicker_Release start");
+    g_debug("clicker_Release start");
     g_mutex_lock(&mutex);
 
     if (g_queue_remove(clickersQueue, clicker) == TRUE) {
         clicker->ownershipsCount --;
     } else {
-        LOG(LOG_ERR, "Internal error: Tried to remove clicker which is not a part of collection!");
+        g_critical("Internal error: Tried to remove clicker which is not a part of collection!");
     }
 
     ReleaseClickerIfNotOwned(clicker);
