@@ -215,7 +215,7 @@ static void GenerateNameForClicker(int clickerId)
     if (clicker != NULL) {
         GenerateClickerName(clicker->name, COMMAND_ENDPOINT_NAME_LENGTH, (char*)_PDConfig.endPointNamePattern, hash,
                 ipFragment);
-        LOG(LOG_INFO, "New clicker connected, ip : %s, id : %d, name : %s", ip, clicker->clickerID, clicker->name);
+        LOG(LOG_INFO, "New clicker connected, ip:[%s], id: %d, name:'%s'", ip, clicker->clickerID, clicker->name);
         clicker_ReleaseOwnership(clicker);
     }
 }

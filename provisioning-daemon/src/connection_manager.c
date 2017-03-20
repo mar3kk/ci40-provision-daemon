@@ -62,7 +62,7 @@ static unsigned long _LastCheckConnectionsTime = 0;
 static int _IDCounter = 0; /**< Used to give UIDs for newly created clickers */
 
 void ConnectionDataToString(ConnectionData* connection, char* buf, size_t bufLen) {
-    snprintf(buf, bufLen, "ClickerID:%d, ip:%s, socket:%d, port:%d, keepAliveTime:%ld", connection->clickerID,
+    snprintf(buf, bufLen, "ClickerID:%d, ip:[%s], socket:%d, port:%d, keepAliveTime:%lu", connection->clickerID,
             connection->ip, connection->socket, connection->port, connection->lastKeepAliveTime);
 }
 
@@ -96,9 +96,6 @@ static void AcceptConnection() {
     connection->socket = newSocket;
     connection->port = ntohs(address.sin6_port);
 
-    //TODO: check, I'm almost certain this call is not needed it's covered by accept above
-    getpeername(newSocket, (struct sockaddr *) &address, &addrLen);
-
     memset(connection->ip, 0, sizeof(connection->ip));
     if (inet_ntop(AF_INET6, &address.sin6_addr, connection->ip, INET6_ADDRSTRLEN) < 0) {
         LOG(LOG_ERR, "Failed to convert ipv6 address to string of clicker id: %d", connection->clickerID);
@@ -118,6 +115,7 @@ static void HandleReceivedData(ConnectionData* connection, uint8_t* buffer, size
     NetworkCommand cmd = buffer[0];
     if (cmd == NetworkCommand_KEEP_ALIVE) {
         connection->lastKeepAliveTime = GetCurrentTimeMillis();
+        LOG(LOG_DBG, "Got keepalive response for clicker:%d", connection->clickerID);
 
     } else {
         dataLen--; //skip info about command (1 byte)
