@@ -29,8 +29,14 @@
                 <img src="/luci-static/resources/creator/gfx/Clicker_connected.jpg" />
             </div>
             <div class="col-lg-5" style="height:50px;">
-                <p class="provision-clicker-name"><%= clicker["name"] %></p>
+                <p class="provision-clicker-name">
+                    <%= clicker["name"] %>
+                    <a style="margin-left:10px; margin-top:-5px;" href="#" onclick="changeClickerName(<%= clicker["id"]%>, '<%= clicker["name"]%>');">
+                        <img src="/luci-static/resources/creator/gfx/ic_mode_edit_black_24dp_1x.png" />
+                    </a>
+                </p>
             </div>
+            
             <div class="col-lg-3 text-right" style="height:50px;">
                 <% if clicker["isError"] and not clicker["inProvisionState"] then %>
                     <p class="provision-error" style="color:red;">PROVISIONING FAILED </p>

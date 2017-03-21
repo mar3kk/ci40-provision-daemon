@@ -17,6 +17,7 @@ function index()
     entry({"admin", "creator", "provisioning", "start_daemon"}, call("start_daemon"), nil, nil).dependent=false
     entry({"admin", "creator", "provisioning", "stop_daemon"}, call("stop_daemon"), nil, nil).dependent=false
     entry({"admin", "creator", "provisioning", "start_stop_daemon"}, call("start_stop_daemon"), nil, nil).dependent=false
+    entry({"admin", "creator", "provisioning", "change_clicker_name"}, call("change_clicker_name"), nil, nil).dependent=false
 end
 
 
@@ -90,5 +91,17 @@ function start_stop_daemon()
     else
         stop_daemon();
     end
+end
 
+function change_clicker_name()
+
+    local clickerID = tonumber(luci.http.formvalue("clickerID"))
+    local clickerName = luci.http.formvalue("clickerName")
+    
+    local status = conn:call("provisioning-daemon", "setClickerName", {clickerID = clickerID, clickerName = clickerName})
+    if (status == nil) then
+        luci.http.status(200, "Failed to change clicker name")
+    else
+        luci.http.status(200, "OK")
+    end
 end
