@@ -77,7 +77,7 @@ bool GenerateRandomX(unsigned char* array, int length)
     if (array == NULL) return false;
 
     for (int i = 0; i < length; ++i)
-        array[i] = rand() % 9;
+        array[i] = g_random_int() % 9;
 
     return true;
 }
