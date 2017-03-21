@@ -66,7 +66,7 @@ static void SelectNextClickerCallback(void)
     g_mutex_lock(&mutex);
     selectedClickerIndex ++;
     if (selectedClickerIndex >= _connectedClickersId->len) {
-        selectedClickerIndex = _connectedClickersId->len - 1;
+        selectedClickerIndex = (_connectedClickersId->len > 0) ? 0 : -1;
     }
     if (selectedClickerIndex == -1) {
         g_message("No clicker is selected now.");
