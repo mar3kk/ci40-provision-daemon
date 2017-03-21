@@ -242,7 +242,7 @@ static int ParseCommandArgs(int argc, char *argv[], const char **fptr)
         {
             case 'v':
                 tmp = (unsigned int)strtoul(optarg, NULL, 0);
-                if (tmp >= 0 && tmp <= 3)
+                if (tmp >= 0 && tmp <= 4)
                 {
                     _PDConfig.logLevel = tmp;
                 }
@@ -326,48 +326,58 @@ static void BlackHoleLogHandlerCallback (const gchar *log_domain, GLogLevelFlags
 
 static void InitLogger() {
     g_mutex_init(&logMutex);
-    g_log_set_handler ("provision daemon", G_LOG_LEVEL_WARNING| G_LOG_LEVEL_CRITICAL | G_LOG_FLAG_RECURSION,
+    g_log_set_handler (NULL, G_LOG_LEVEL_MASK | G_LOG_FLAG_RECURSION,
+            BlackHoleLogHandlerCallback, NULL);
+    g_log_set_handler (NULL, G_LOG_LEVEL_WARNING| G_LOG_LEVEL_CRITICAL | G_LOG_FLAG_RECURSION,
             LogHandlerCallback, NULL);
 }
 
 static void UpdateLogLevel() {
     //remove all
-    g_log_set_handler ("provision daemon", G_LOG_LEVEL_MASK | G_LOG_FLAG_FATAL | G_LOG_FLAG_RECURSION,
+    g_log_set_handler (NULL, G_LOG_LEVEL_MASK | G_LOG_FLAG_RECURSION,
             BlackHoleLogHandlerCallback, NULL);
 
     GLogLevelFlags targetFlags = G_LOG_FLAG_RECURSION;
     switch(_PDConfig.logLevel) {
         case 0: //debug
-            targetFlags |= G_LOG_LEVEL_DEBUG | G_LOG_LEVEL_CRITICAL | G_LOG_LEVEL_ERROR | G_LOG_LEVEL_WARNING |
-                G_LOG_LEVEL_INFO;
+            targetFlags |= G_LOG_LEVEL_DEBUG | G_LOG_LEVEL_INFO | G_LOG_LEVEL_MESSAGE | G_LOG_LEVEL_WARNING |
+                G_LOG_LEVEL_CRITICAL | G_LOG_LEVEL_ERROR;
+            g_setenv("G_MESSAGES_DEBUG", "all", FALSE);
             break;
 
         case 1: //info
-            targetFlags |= G_LOG_LEVEL_CRITICAL | G_LOG_LEVEL_ERROR | G_LOG_LEVEL_WARNING | G_LOG_LEVEL_INFO;
+            targetFlags |= G_LOG_LEVEL_INFO | G_LOG_LEVEL_MESSAGE | G_LOG_LEVEL_WARNING | G_LOG_LEVEL_CRITICAL |
+                G_LOG_LEVEL_ERROR;
+            g_setenv("G_MESSAGES_DEBUG", "all", FALSE);
+            break;
+
+        case 2: //message
+            targetFlags |= G_LOG_LEVEL_MESSAGE | G_LOG_LEVEL_WARNING | G_LOG_LEVEL_CRITICAL | G_LOG_LEVEL_ERROR;
+            g_setenv("G_MESSAGES_DEBUG", "all", FALSE);
             break;
 
         default:
-        case 2: //warning
-            targetFlags |= G_LOG_LEVEL_CRITICAL | G_LOG_LEVEL_ERROR | G_LOG_LEVEL_WARNING;
+        case 3: //warning
+            targetFlags |= G_LOG_LEVEL_WARNING | G_LOG_LEVEL_CRITICAL | G_LOG_LEVEL_ERROR;
             break;
 
-        case 3: //error (critical);
+        case 4: //error (critical);
             targetFlags |= G_LOG_LEVEL_CRITICAL | G_LOG_LEVEL_ERROR;
             break;
     }
     //set new handlers per flags
-    g_log_set_handler ("provision daemon", targetFlags, LogHandlerCallback, NULL);
+    g_log_set_handler (NULL, targetFlags, LogHandlerCallback, NULL);
 }
 
 int main(int argc, char **argv)
 {
     InitLogger();
-    int ret;
+
     const char *fptr = NULL;
     FILE *logFile;
-    if ((ret = ParseCommandArgs(argc, argv, &fptr)) < 0)
+    if (ParseCommandArgs(argc, argv, &fptr) < 0)
     {
-        g_critical("Invalid command args");
+        g_error("Invalid command args");
         return -1;
     }
 
