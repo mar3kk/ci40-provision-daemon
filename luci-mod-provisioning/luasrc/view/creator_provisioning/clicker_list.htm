@@ -55,12 +55,10 @@
                     <img src="/luci-static/resources/creator/gfx/ic-loading.svg" style="margin-top:13px;float:left;display:block;"/>
                     <p style="float:left;font-size:11px;">PROVISIONING</p>
                 </div>
-                <% elseif clicker["selected"] and not clicker["isError"] then %>
-                <a class="btn-creator provision-button" style="width:120px; margin:7px 0px 0px 0px !important;" onclick="startProvisioning(<%= clicker["id"]%>);return;">PROVISION</a>
-                <% elseif clicker["selected"] and clicker["isError"] then %>
+                <% elseif clicker["isError"] then %>
                 <a class="btn-creator provision-button" style="width:120px; margin:7px 0px 0px 0px !important;text-align:center;" onclick="startProvisioning(<%= clicker["id"]%>);return;">RETRY</a>
                 <% else %>
-                <a class="btn-creator provision-button disabled" style="width:120px; margin:7px 0px 0px 0px !important;">PROVISION</a>
+                <a class="btn-creator provision-button" style="width:120px; margin:7px 0px 0px 0px !important;" onclick="startProvisioning(<%= clicker["id"]%>);return;">PROVISION</a>
                 <% end %>
             </div>
         </div>
