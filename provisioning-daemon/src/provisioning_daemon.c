@@ -124,7 +124,7 @@ static bool ReadConfigFile(const char *filePath)
     {
         if(!config_lookup_string(&_Cfg, "BOOTSTRAP_URI", &_PDConfig.bootstrapUri))
         {
-            g_critical("Config file does not contain BOOTSTRAP_URI property, using default:%s", CONFIG_BOOTSTRAP_URI);
+            g_warning("Config file does not contain BOOTSTRAP_URI property, using default:%s", CONFIG_BOOTSTRAP_URI);
             _PDConfig.bootstrapUri = CONFIG_BOOTSTRAP_URI;
         }
     }
@@ -151,7 +151,7 @@ static bool ReadConfigFile(const char *filePath)
     {
         if(!config_lookup_string(&_Cfg, "ENDPOINT_NAME_PATTERN", &_PDConfig.endPointNamePattern))
         {
-            g_critical("Config file does not contain ENDPOINT_NAME_PATTERN property, using default:%s.",
+            g_warning("Config file does not contain ENDPOINT_NAME_PATTERN property, using default:%s.",
                     CONFIG_DEFAULT_ENDPOINT_PATTERN);
             _PDConfig.endPointNamePattern = CONFIG_DEFAULT_ENDPOINT_PATTERN;
         }
@@ -161,8 +161,13 @@ static bool ReadConfigFile(const char *filePath)
     {
         if(!config_lookup_int(&_Cfg, "LOG_LEVEL", &_PDConfig.logLevel))
         {
-            g_critical("Config file does not contain LOG_LEVEL property. Using default value: Warning");
+            g_warning("Config file does not contain LOG_LEVEL property. Using default value: Warning");
             _PDConfig.logLevel = 3;
+        } else {
+            if (_PDConfig.logLevel < 1 || _PDConfig.logLevel > 5) {
+                _PDConfig.logLevel = 3;
+                g_warning("Config file contains illegal value of LOG_LEVEL variable, forcing to level: Warning");
+            }
         }
     }
 
@@ -180,7 +185,7 @@ static bool ReadConfigFile(const char *filePath)
     {
         if(!config_lookup_bool(&_Cfg, "LOCAL_PROVISION_CTRL", &_PDConfig.localProvisionControl))
         {
-            g_critical("Config file does not contain LOCAL_PROVISION_CTRL property, using default: %d",
+            g_warning("Config file does not contain LOCAL_PROVISION_CTRL property, using default: %d",
                     CONFIG_DEFAULT_LOCAL_PROV_CTRL);
             _PDConfig.localProvisionControl = CONFIG_DEFAULT_LOCAL_PROV_CTRL;
         }
@@ -190,7 +195,7 @@ static bool ReadConfigFile(const char *filePath)
     {
         if(!config_lookup_bool(&_Cfg, "REMOTE_PROVISION_CTRL", &_PDConfig.remoteProvisionControl))
         {
-            g_critical("Config file does not contain REMOTE_PROVISION_CTRL property, using default: %d",
+            g_warning("Config file does not contain REMOTE_PROVISION_CTRL property, using default: %d",
                     CONFIG_DEFAULT_REMOTE_PROV_CTRL);
             _PDConfig.remoteProvisionControl = CONFIG_DEFAULT_REMOTE_PROV_CTRL;
         }
@@ -242,7 +247,7 @@ static int ParseCommandArgs(int argc, char *argv[], const char **fptr)
         {
             case 'v':
                 tmp = (unsigned int)strtoul(optarg, NULL, 0);
-                if (tmp >= 0 && tmp <= 4)
+                if (tmp >= 1 && tmp <= 5)
                 {
                     _PDConfig.logLevel = tmp;
                 }
@@ -339,29 +344,29 @@ static void UpdateLogLevel() {
 
     GLogLevelFlags targetFlags = G_LOG_FLAG_RECURSION;
     switch(_PDConfig.logLevel) {
-        case 0: //debug
+        case 5: //debug
             targetFlags |= G_LOG_LEVEL_DEBUG | G_LOG_LEVEL_INFO | G_LOG_LEVEL_MESSAGE | G_LOG_LEVEL_WARNING |
                 G_LOG_LEVEL_CRITICAL | G_LOG_LEVEL_ERROR;
             g_setenv("G_MESSAGES_DEBUG", "all", FALSE);
             break;
 
-        case 1: //info
+        case 4: //info
             targetFlags |= G_LOG_LEVEL_INFO | G_LOG_LEVEL_MESSAGE | G_LOG_LEVEL_WARNING | G_LOG_LEVEL_CRITICAL |
                 G_LOG_LEVEL_ERROR;
             g_setenv("G_MESSAGES_DEBUG", "all", FALSE);
             break;
 
-        case 2: //message
+        case 3: //message
             targetFlags |= G_LOG_LEVEL_MESSAGE | G_LOG_LEVEL_WARNING | G_LOG_LEVEL_CRITICAL | G_LOG_LEVEL_ERROR;
             g_setenv("G_MESSAGES_DEBUG", "all", FALSE);
             break;
 
         default:
-        case 3: //warning
+        case 2: //warning
             targetFlags |= G_LOG_LEVEL_WARNING | G_LOG_LEVEL_CRITICAL | G_LOG_LEVEL_ERROR;
             break;
 
-        case 4: //error (critical);
+        case 1: //error (critical);
             targetFlags |= G_LOG_LEVEL_CRITICAL | G_LOG_LEVEL_ERROR;
             break;
     }

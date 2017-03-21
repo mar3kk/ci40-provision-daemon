@@ -187,11 +187,11 @@ static int StartProvisionMethodHandler(struct ubus_context *ctx, struct ubus_obj
 static int GetStateMethodHandler(struct ubus_context *ctx, struct ubus_object *obj, struct ubus_request_data *req,
         const char *method, struct blob_attr *msg)
 {
-    g_debug("uBusAgent: Requested GetState");
+    //g_debug("uBusAgent: Requested GetState");
 
     GArray* connectedClickers = controls_GetAllClickersIds();
     int selClickerId = controls_GetSelectedClickerId();
-    g_debug("uBusAgent: GetState clicker count:%d, selected id:%d", connectedClickers->len, selClickerId);
+    //g_debug("uBusAgent: GetState clicker count:%d, selected id:%d", connectedClickers->len, selClickerId);
 
     //add history data
     GArray* historyItems = history_GetProvisioned();

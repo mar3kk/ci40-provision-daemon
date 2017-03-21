@@ -113,7 +113,7 @@ static void HandleReceivedData(ConnectionData* connection, uint8_t* buffer, size
     NetworkCommand cmd = buffer[0];
     if (cmd == NetworkCommand_KEEP_ALIVE) {
         connection->lastKeepAliveTime = GetCurrentTimeMillis();
-        g_debug("Got keepalive response for clicker:%d", connection->clickerID);
+        //g_debug("Got keepalive response for clicker:%d", connection->clickerID);
 
     } else {
         dataLen--; //skip info about command (1 byte)

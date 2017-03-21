@@ -68,7 +68,11 @@ static void SelectNextClickerCallback(void)
     if (selectedClickerIndex >= _connectedClickersId->len) {
         selectedClickerIndex = _connectedClickersId->len - 1;
     }
-    g_message( "Selected Clicker ID : %d", g_array_index(_connectedClickersId, int, selectedClickerIndex));
+    if (selectedClickerIndex == -1) {
+        g_message("No clicker is selected now.");
+    } else {
+        g_message("Selected Clicker ID : %d", g_array_index(_connectedClickersId, int, selectedClickerIndex));
+    }
     g_mutex_unlock(&mutex);
     UpdateHighlights();
 }
@@ -209,7 +213,11 @@ static void RemoveClickerWithID(int clickerID) {
 
         if (selectedClickerIndex >= _connectedClickersId->len) {
             selectedClickerIndex = _connectedClickersId->len - 1;
-            g_message( "Selected Clicker ID : %d", g_array_index(_connectedClickersId, int, selectedClickerIndex));
+            if (selectedClickerIndex == -1) {
+                g_message("No clicker is selected now.");
+            } else {
+                g_message("Selected Clicker ID : %d", g_array_index(_connectedClickersId, int, selectedClickerIndex));
+            }
         }
     }
     g_mutex_unlock(&mutex);
