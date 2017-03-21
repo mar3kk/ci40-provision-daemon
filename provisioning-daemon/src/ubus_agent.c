@@ -77,6 +77,7 @@ static const struct blobmsg_policy _SelectPolicy[] = {
 };
 
 static const struct blobmsg_policy _StartProvisionPolicy[] = {
+    [SELECT_CLICKER_ID] = { .name = "clickerID", .type = BLOBMSG_TYPE_INT32 },
 };
 
 enum {
@@ -165,7 +166,7 @@ static int SelectMethodHandler(struct ubus_context *ctx, struct ubus_object *obj
     if (argBuffer[SELECT_CLICKER_ID])
         clickerId = blobmsg_get_u32(argBuffer[SELECT_CLICKER_ID]);
 
-    g_debug("uBusAgent: Select, move to clickerId:%d", clickerId);
+    g_info("uBusAgent: Select, move to clickerId:%d", clickerId);
 
     event_PushEventWithInt(EventType_CLICKER_SELECT, clickerId);
 
@@ -175,10 +176,17 @@ static int SelectMethodHandler(struct ubus_context *ctx, struct ubus_object *obj
 static int StartProvisionMethodHandler(struct ubus_context *ctx, struct ubus_object *obj, struct ubus_request_data *req,
         const char *method, struct blob_attr *msg)
 {
-    g_debug("uBusAgent: Requested StartProvision");
+    struct blob_attr* argBuffer[SELECT_LAST_ENUM];
 
-    //TODO: web page can be upgraded to send clickeID, this allow to provision any visible clicker not only selected
-    int clickerId = controls_GetSelectedClickerId();
+    blobmsg_parse(_StartProvisionPolicy, ARRAY_SIZE(_StartProvisionPolicy), argBuffer, blob_data(msg), blob_len(msg));
+
+    uint32_t clickerId = 0xffffffff;
+    if (argBuffer[SELECT_CLICKER_ID]) {
+        clickerId = blobmsg_get_u32(argBuffer[SELECT_CLICKER_ID]);
+    } else {
+        clickerId = controls_GetSelectedClickerId();
+    }
+    g_info("uBusAgent: Requested StartProvision, clicker id: %d", clickerId);
     event_PushEventWithInt(EventType_CLICKER_START_PROVISION, clickerId);
 
     return UBUS_STATUS_OK;
