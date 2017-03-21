@@ -122,7 +122,7 @@ void TryToSendPsk(int clickerId)
 
         g_message("Sent Network Config to clicker with id : %d", clicker->clickerID);
         g_message("Provisioning of clicker with id : %d finished, going back to LISTENING mode", clicker->clickerID);
-        clicker->provisionTime = GetCurrentTimeMillis();
+        clicker->provisionTime = g_get_monotonic_time();
         clicker->provisioningInProgress = false;
     } else {
         g_message("TryToSendPsk: Can't send not all data avail, this is not error.");

@@ -65,18 +65,6 @@ static int itoa(unsigned int num, char* str, int len, int base)
     return 0;
 }
 
-unsigned long GetCurrentTimeMillis(void)
-{
-    struct timeval _Timeval;
-    unsigned long current_time_ms = 0;
-    if (gettimeofday(&_Timeval, NULL) == 0)
-        current_time_ms = _Timeval.tv_sec * 1000 + _Timeval.tv_usec / 1000;
-    else
-        g_critical("Failed to get current time.");
-
-    return current_time_ms;
-}
-
 void HexStringToByteArray(const char* hexstr, uint8_t * dst, size_t len)
 {
     size_t final_len = strnlen(hexstr, len*2);
@@ -96,7 +84,7 @@ bool GenerateRandomX(unsigned char* array, int length)
 
 void GenerateClickerTimeHash(char *buffer)
 {
-    unsigned long currentTimeSeconds = GetCurrentTimeMillis() / 1000;
+    gint64 currentTimeSeconds = g_get_monotonic_time() / 1000;
     itoa(currentTimeSeconds, buffer, 10, 52);
 }
 

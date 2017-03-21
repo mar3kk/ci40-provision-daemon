@@ -426,7 +426,7 @@ int main(int argc, char **argv)
     g_message("Entering main loop");
     while(_KeepRunning)
     {
-        unsigned long loopStartTime = GetCurrentTimeMillis();
+        gint64 loopStartTime = g_get_monotonic_time();
 
         con_ProcessConnections();
         controls_Update();
@@ -450,7 +450,7 @@ int main(int argc, char **argv)
         }
         //-----------------
 
-        unsigned long loopEndTime = GetCurrentTimeMillis();
+        gint64 loopEndTime = g_get_monotonic_time();
         if (loopEndTime - loopStartTime < 50)
             usleep(1000*(50-(loopEndTime-loopStartTime)));
     }

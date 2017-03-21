@@ -44,12 +44,6 @@
 #define ARRAY_SIZE(x) ((sizeof x) / (sizeof *x))
 
 /**
- * @brief Returns the current time in milliseconds
- * @return number of milliseconds since epoch
- */
-unsigned long GetCurrentTimeMillis(void);
-
-/**
  * @brief Converts given hex string into array of bytes.
  * @param hexstr string to convert
  * @param dst bufer in which result will be stroed.

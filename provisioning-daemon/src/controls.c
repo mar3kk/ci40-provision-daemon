@@ -163,7 +163,7 @@ void CheckForFinishedProvisionings(void) {
             continue;
         }
         if (clicker->provisionTime > 0) {
-            if (GetCurrentTimeMillis() - clicker->provisionTime > TIME_TO_DISCONNECT_AFTER_PROVISION) {
+            if (g_get_monotonic_time() - clicker->provisionTime > TIME_TO_DISCONNECT_AFTER_PROVISION) {
                 con_Disconnect(clicker->clickerID);
             }
         }
@@ -189,7 +189,7 @@ void controls_Update(void) {
         clicker_ReleaseOwnership(clicker);
     }
 
-    unsigned long currentTime = GetCurrentTimeMillis();
+    unsigned long currentTime = g_get_monotonic_time();
     if (currentTime - _LastBlinkTime > interval) {
         _LastBlinkTime = currentTime;
         g_activeLedOn = !g_activeLedOn;

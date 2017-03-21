@@ -44,7 +44,7 @@
 
 typedef struct {
     char name[MAX_HISTORY_NAME];
-    unsigned long timestamp;
+    gint64 timestamp;
     int id;
     bool isErrored;
 } HistoryEntry;
@@ -68,7 +68,7 @@ void AddToHistory(int clickerId) {
     }
 
     HistoryEntry* entry = g_malloc(sizeof(HistoryEntry));
-    entry->timestamp = GetCurrentTimeMillis();
+    entry->timestamp = g_get_monotonic_time();
     entry->id = clickerId;
     entry->isErrored = false;
     strlcpy(entry->name, clicker->name, MAX_HISTORY_NAME - 1);
@@ -83,7 +83,7 @@ void AddToHistory(int clickerId) {
 
 void PurgeOld(void) {
     //NOTE: called from inside mutex
-    unsigned long current = GetCurrentTimeMillis();
+    unsigned long current = g_get_monotonic_time();
 
     GSList* prev = NULL;
     for (GSList* iter = _historyElements; iter != NULL; iter = iter->next) {

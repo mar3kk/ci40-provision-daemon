@@ -69,7 +69,7 @@ typedef struct Clicker
 
     bool taskInProgress;
     bool provisioningInProgress;        /**< true - if provisioning is taking place on this clicker, otherwise false */
-    unsigned long provisionTime;        /**< unix timestamp telling when provisioning process of this clicker has finished. 0 of provisioning is not finished yet. */
+    gint64 provisionTime;        /**< unix timestamp telling when provisioning process of this clicker has finished. 0 of provisioning is not finished yet. */
     int error;
 } Clicker;
 
