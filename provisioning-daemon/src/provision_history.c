@@ -71,7 +71,7 @@ void AddToHistory(int clickerId) {
     entry->timestamp = g_get_monotonic_time() / 1000;
     entry->id = clickerId;
     entry->isErrored = false;
-    strlcpy(entry->name, clicker->name, MAX_HISTORY_NAME - 1);
+    strlcpy(entry->name, clicker->name, MAX_HISTORY_NAME);
 
     clicker_ReleaseOwnership(clicker);
 
