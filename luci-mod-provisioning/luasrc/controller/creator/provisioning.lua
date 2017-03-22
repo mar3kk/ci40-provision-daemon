@@ -53,7 +53,7 @@ function start_provisioning()
         luci.http.status (404, "Invalid clickerID")
     end
 
-    local response = provisioning.startProvisioning()
+    local response = provisioning.startProvisioning(clickerID)
 
 end
 
