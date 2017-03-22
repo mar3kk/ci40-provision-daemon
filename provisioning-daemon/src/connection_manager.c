@@ -43,6 +43,7 @@
 #include <net/if.h>
 #include <stdlib.h>
 #include <glib.h>
+#include <string.h>
 
 typedef struct {
     int clickerID; /**< id of clicker bound to this connection. */

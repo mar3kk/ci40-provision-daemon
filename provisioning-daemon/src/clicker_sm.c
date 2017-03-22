@@ -29,6 +29,7 @@
  */
 
 #include <unistd.h>
+#include <string.h>
 #include "clicker_sm.h"
 #include "crypto/crypto_config.h"
 #include "crypto/encoder.h"

@@ -52,15 +52,23 @@ static int SetClickerNameMethodHandler(struct ubus_context *ctx, struct ubus_obj
         const char *method, struct blob_attr *msg);
 
 //variables & structs
+typedef struct {
+    int clickerId;
+    bool toDelete;
+    struct ubus_request request;
+    struct blob_buf replyBloob;
+} UBusMemoryBlock;
+
 static struct ubus_context *_UbusCTX;
 static pthread_t _UbusThread;
 static char *_Path;
-static struct blob_buf replyBloob;
-static sem_t semaphore;
-static bool uBusRunning;
-static bool uBusInterruption;
-static bool uBusInInterState;
+static GMutex mutex;
+static bool uBusRunning = false;
+static bool uBusInterruption = false;
+static bool uBusInInterState = false;
 struct uloop_timeout uBusHelperProcess;
+//holds UBusMemoryBlock elements
+GSList* _uBusRequestMemory = NULL;
 
 static const struct blobmsg_policy _GetStatePolicy[] = {
 };
@@ -123,6 +131,22 @@ static const struct blobmsg_policy _GeneratePskResponsePolicy[GENERATE_PSK_RESPO
     [GENERATE_PSK_RESPONSE_PSK_SECRET] = {.name = "pskSecret", .type = BLOBMSG_TYPE_STRING},
     [GENERATE_PSK_RESPONSE_ERROR] = {.name = "error", .type = BLOBMSG_TYPE_STRING},
 };
+
+static UBusMemoryBlock* createUBusMemoryBlock() {
+    //Note: Should be called from critical section
+    UBusMemoryBlock* result = g_malloc0(sizeof(UBusMemoryBlock));
+    _uBusRequestMemory = g_slist_prepend(_uBusRequestMemory, result);
+    blob_buf_init(&result->replyBloob, 0);
+    result->toDelete = false;
+    return result;
+}
+
+static void releaseUBusMemoryBlock(UBusMemoryBlock* block) {
+    //Note: Should be called from critical section
+    _uBusRequestMemory = g_slist_remove(_uBusRequestMemory, block);
+    blob_buf_free(&block->replyBloob);
+    g_free(block);
+}
 
 static int SetClickerNameMethodHandler(struct ubus_context *ctx, struct ubus_object *obj, struct ubus_request_data *req,
         const char *method, struct blob_attr *msg) {
@@ -203,7 +227,7 @@ static int GetStateMethodHandler(struct ubus_context *ctx, struct ubus_object *o
 
     //add history data
     GArray* historyItems = history_GetProvisioned();
-
+    struct blob_buf replyBloob;
     blob_buf_init(&replyBloob, 0);
     void* cookie_array = blobmsg_open_array(&replyBloob, "clickers");
     for(int t = 0; t < historyItems->len; t++)
@@ -267,18 +291,20 @@ static int GetStateMethodHandler(struct ubus_context *ctx, struct ubus_object *o
 
 static void GeneratePskResponseHandler(struct ubus_request *req, int type, struct blob_attr *msg)
 {
+    g_critical("Got: %p", msg);
     struct blob_attr *args[GENERATE_PSK_RESPONSE_MAX];
 
     blobmsg_parse(_GeneratePskResponsePolicy, GENERATE_PSK_RESPONSE_MAX, args, blob_data(msg), blob_len(msg));
-    int clickerId = (int)req->priv;
+    UBusMemoryBlock* block = (UBusMemoryBlock*)req->priv;
 
     char *error = blobmsg_get_string(args[GENERATE_PSK_RESPONSE_ERROR]);
     if (error)
     {
         g_critical("uBusAgent: Error while generating PSK : %s", error);
         PreSharedKey* eventData = g_new0(PreSharedKey, 1);
-        eventData->clickerId = clickerId;
+        eventData->clickerId = block->clickerId;
         event_PushEventWithPtr(EventType_PSK_OBTAINED, eventData, true);
+        block->toDelete = true;
         return;
     }
 
@@ -288,8 +314,9 @@ static void GeneratePskResponseHandler(struct ubus_request *req, int type, struc
     {
         g_critical("uBusAgent: UNKNOWN PSK");
         PreSharedKey* eventData = g_new0(PreSharedKey, 1);
-        eventData->clickerId = clickerId;
+        eventData->clickerId = block->clickerId;
         event_PushEventWithPtr(EventType_PSK_OBTAINED, eventData, true);
+        block->toDelete = true;
         return;
     }
 
@@ -298,15 +325,16 @@ static void GeneratePskResponseHandler(struct ubus_request *req, int type, struc
     {
         g_critical("uBusAgent: UNKNOWN PSK");
         PreSharedKey* eventData = g_new0(PreSharedKey, 1);
-        eventData->clickerId = clickerId;
+        eventData->clickerId = block->clickerId;
         event_PushEventWithPtr(EventType_PSK_OBTAINED, eventData, true);
+        block->toDelete = true;
         return;
     }
 
     g_message("uBusAgent: Obtained PSK: %s and IDENTITY: %s", psk, identity);
 
     PreSharedKey* eventData = g_new0(PreSharedKey, 1);
-    eventData->clickerId = clickerId;
+    eventData->clickerId = block->clickerId;
 
     strlcpy(eventData->identity, identity, PSK_ARRAYS_SIZE);
     eventData->identityLen = strlen(identity);
@@ -317,15 +345,16 @@ static void GeneratePskResponseHandler(struct ubus_request *req, int type, struc
     eventData->pskLen = eventData->pskLen > PSK_ARRAYS_SIZE ? PSK_ARRAYS_SIZE : eventData->pskLen;
 
     event_PushEventWithPtr(EventType_PSK_OBTAINED, eventData, true);
+    block->toDelete = true;
 }
 
 void HelperTimeoutHandler(struct uloop_timeout *t)
 {
-    sem_wait(&semaphore);
+    g_mutex_lock(&mutex);
     if (uBusInterruption)
         uloop_cancelled = true;
 
-    sem_post(&semaphore);
+    g_mutex_unlock(&mutex);
     uloop_timeout_set(&uBusHelperProcess, 500);
 }
 
@@ -334,23 +363,30 @@ static void* PDUbusLoop(void *arg)
     g_message("uBusAgent: uBus thread started.\n");
     while(true)
     {
-        sem_wait(&semaphore);
+        g_mutex_lock(&mutex);
         if (uBusRunning == false)
         {
-            sem_post(&semaphore);
+            g_mutex_unlock(&mutex);
             break;
         }
 
         while(uBusInterruption)
         {
             uBusInInterState = true;
-            g_message("Interrupt state");
-            sem_post(&semaphore);
+            g_debug("Interrupt state");
+            g_mutex_unlock(&mutex);
             usleep(1000 * 1000);
-            sem_wait(&semaphore);
+            g_mutex_lock(&mutex);
             uBusInInterState = false;
         }
-        sem_post(&semaphore);
+        //check for memory removal
+        if (_uBusRequestMemory != NULL) {
+            UBusMemoryBlock* block = (UBusMemoryBlock*)_uBusRequestMemory->data;
+            if ( block->toDelete ) {
+                releaseUBusMemoryBlock(block);
+            }
+        }
+        g_mutex_unlock(&mutex);
         uloop_run();
     }
     g_message("uBusAgent: uBus thread finish.\n");
@@ -359,26 +395,26 @@ static void* PDUbusLoop(void *arg)
 
 static void SetUBusRunning(bool state)
 {
-    sem_wait(&semaphore);
+    g_mutex_lock(&mutex);
     uBusRunning = state;
-    sem_post(&semaphore);
+    g_mutex_unlock(&mutex);
 }
 
 static void SetUBusLoopInterruption(bool state)
 {
-    sem_wait(&semaphore);
+    g_mutex_lock(&mutex);
     uBusInterruption = state;
     uloop_cancelled = state;
-    sem_post(&semaphore);
+    g_mutex_unlock(&mutex);
 }
 
 static void WaitForInterruptState(void)
 {
     while(true)
     {
-        sem_wait(&semaphore);
+        g_mutex_lock(&mutex);
         bool ok = uBusInInterState;
-        sem_post(&semaphore);
+        g_mutex_unlock(&mutex);
         if (ok)
             break;
 
@@ -388,7 +424,7 @@ static void WaitForInterruptState(void)
 
 bool ubusagent_Init(void)
 {
-    sem_init(&semaphore, 0, 1);
+    g_mutex_init(&mutex);
     uloop_init();
     _UbusCTX = ubus_connect(_Path);
     if (!_UbusCTX)
@@ -436,7 +472,14 @@ void ubusagent_Close(void)
         ubus_free(_UbusCTX);
 
     uloop_done();
-    sem_destroy(&semaphore);
+
+    while (_uBusRequestMemory != NULL) {
+        UBusMemoryBlock* block = (UBusMemoryBlock*) _uBusRequestMemory->data;
+        if (block->toDelete) {
+            releaseUBusMemoryBlock(block);
+        }
+    }
+    g_mutex_clear(&mutex);
 }
 
 //Warn: this is blocking call
@@ -445,22 +488,29 @@ bool ubusagent_SendGeneratePskMessage(int clickerId)
     SetUBusLoopInterruption(true);
     WaitForInterruptState();
     uint32_t id, ret;
-    blob_buf_init(&replyBloob, 0);
     ret = ubus_lookup_id(_UbusCTX, "creator", &id);
     if (ret)
     {
         g_critical("uBusAgent: creator ubus service not available");
+        SetUBusLoopInterruption(false);
         return false;
     }
 
-    ret = ubus_invoke(_UbusCTX, id, "generatePsk", replyBloob.head, GeneratePskResponseHandler, (void*)clickerId, 10000);
+    g_mutex_lock(&mutex);
+    UBusMemoryBlock* block = createUBusMemoryBlock();
+    g_mutex_unlock(&mutex);
+    block->clickerId = clickerId;
+    ret = ubus_invoke_async(_UbusCTX, id, "generatePsk", block->replyBloob.head, &block->request);
+    block->request.priv = (void*)block;
+    block->request.data_cb = GeneratePskResponseHandler;
+    ubus_complete_request_async(_UbusCTX, &block->request);
+
     if (ret)
     {
         g_critical("uBusAgent: Filed to invoke generatePsk");
+        SetUBusLoopInterruption(false);
         return false;
     }
-    blob_buf_free(&replyBloob);
     SetUBusLoopInterruption(false);
-
     return true;
 }
