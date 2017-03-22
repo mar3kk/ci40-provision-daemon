@@ -68,7 +68,7 @@ void AddToHistory(int clickerId) {
     }
 
     HistoryEntry* entry = g_malloc(sizeof(HistoryEntry));
-    entry->timestamp = g_get_monotonic_time();
+    entry->timestamp = g_get_monotonic_time() / 1000;
     entry->id = clickerId;
     entry->isErrored = false;
     strlcpy(entry->name, clicker->name, MAX_HISTORY_NAME - 1);
@@ -83,7 +83,7 @@ void AddToHistory(int clickerId) {
 
 void PurgeOld(void) {
     //NOTE: called from inside mutex
-    unsigned long current = g_get_monotonic_time();
+    unsigned long current = g_get_monotonic_time() / 1000;
 
     GSList* prev = NULL;
     for (GSList* iter = _historyElements; iter != NULL; iter = iter->next) {

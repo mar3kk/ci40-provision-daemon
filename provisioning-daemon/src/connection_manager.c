@@ -90,7 +90,7 @@ static void AcceptConnection() {
 
     ConnectionData* connection = g_new0(ConnectionData, 1);
     connection->clickerID = _IDCounter;
-    connection->lastKeepAliveTime = g_get_monotonic_time();
+    connection->lastKeepAliveTime = g_get_monotonic_time() / 1000;
     connection->socket = newSocket;
     connection->port = ntohs(address.sin6_port);
 
@@ -112,7 +112,7 @@ static void AcceptConnection() {
 static void HandleReceivedData(ConnectionData* connection, uint8_t* buffer, size_t dataLen) {
     NetworkCommand cmd = buffer[0];
     if (cmd == NetworkCommand_KEEP_ALIVE) {
-        connection->lastKeepAliveTime = g_get_monotonic_time();
+        connection->lastKeepAliveTime = g_get_monotonic_time() / 1000;
         //g_debug("Got keepalive response for clicker:%d", connection->clickerID);
 
     } else {
@@ -205,7 +205,7 @@ static void SendCommandWithData(ConnectionData* connection, NetworkCommand comma
 }
 
 static void CheckConnections(void) {
-    gint64 currentTimeMillis = g_get_monotonic_time();
+    gint64 currentTimeMillis = g_get_monotonic_time() / 1000;
     if (currentTimeMillis - _LastCheckConnectionsTime > CHECK_CONNECTIONS_INTERVAL_MS) {
         _LastCheckConnectionsTime = currentTimeMillis;
 
@@ -217,7 +217,7 @@ static void CheckConnections(void) {
 }
 
 static void SendKeepAlive(void) {
-    unsigned long currentTimeMillis = g_get_monotonic_time();
+    unsigned long currentTimeMillis = g_get_monotonic_time() / 1000;
     if (currentTimeMillis - _LastKeepAliveSendTime > KEEP_ALIVE_INTERVAL_MS) {
         _LastKeepAliveSendTime = currentTimeMillis;
         for (GList* iter = _connectionsList; iter != NULL; iter = iter->next) {

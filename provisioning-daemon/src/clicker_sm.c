@@ -122,7 +122,7 @@ void TryToSendPsk(int clickerId)
 
         g_message("Sent Network Config to clicker with id : %d", clicker->clickerID);
         g_message("Provisioning of clicker with id : %d finished, going back to LISTENING mode", clicker->clickerID);
-        clicker->provisionTime = g_get_monotonic_time();
+        clicker->provisionTime = g_get_monotonic_time() / 1000;
         clicker->provisioningInProgress = false;
     } else {
         g_message("TryToSendPsk: Can't send not all data avail, this is not error.");
@@ -191,7 +191,7 @@ static void ObtainedPSK(PreSharedKey* pskData) {
 
     clicker->identityLen = pskData->identityLen;
     clicker->identity = g_malloc(pskData->identityLen + 1);
-    strlcpy((char*)clicker->identity, pskData->identity, pskData->identityLen);
+    strlcpy((char*)clicker->identity, pskData->identity, pskData->identityLen + 1);
 
     clicker_ReleaseOwnership(clicker);
 

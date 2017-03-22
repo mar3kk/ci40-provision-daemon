@@ -84,7 +84,7 @@ bool GenerateRandomX(unsigned char* array, int length)
 
 void GenerateClickerTimeHash(char *buffer)
 {
-    gint64 currentTimeSeconds = g_get_monotonic_time() / 1000;
+    gint64 currentTimeSeconds = g_get_monotonic_time() / (1000 * 1000);
     itoa(currentTimeSeconds, buffer, 10, 52);
 }
 
