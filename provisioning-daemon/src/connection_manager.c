@@ -80,7 +80,7 @@ static void HandleDisconnect(ConnectionData* connection) {
 static void AcceptConnection() {
     int newSocket = 0;
     struct sockaddr_in6 address;
-    socklen_t addrLen;
+    socklen_t addrLen = sizeof(address);
 
     if ((newSocket = accept(_MasterSocket, (struct sockaddr *) &address, &addrLen)) < 0) {
         g_critical("Error accepting connection. Errno: %d \n", errno);
