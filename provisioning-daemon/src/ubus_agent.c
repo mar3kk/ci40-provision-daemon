@@ -227,7 +227,7 @@ static int GetStateMethodHandler(struct ubus_context *ctx, struct ubus_object *o
 
     //add history data
     GArray* historyItems = history_GetProvisioned();
-    struct blob_buf replyBloob;
+    struct blob_buf replyBloob = {0, NULL, 0, NULL};
     blob_buf_init(&replyBloob, 0);
     void* cookie_array = blobmsg_open_array(&replyBloob, "clickers");
     for(int t = 0; t < historyItems->len; t++)
