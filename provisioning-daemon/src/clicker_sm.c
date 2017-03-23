@@ -220,6 +220,18 @@ static void GenerateNameForClicker(int clickerId)
     }
 }
 
+static void handleStartProvision(int clickerId) {
+    Clicker* clicker = clicker_AcquireOwnership(clickerId);
+    if (clicker == NULL) {
+        g_critical("No clicker with id:%d, this is internal error.", clickerId);
+        return;
+    }
+    clicker->provisioningInProgress = true;
+    clicker_ReleaseOwnership(clicker);
+    event_PushEventWithInt(EventType_HISTORY_REMOVE, clickerId);
+    ubusagent_SendGeneratePskMessage(clickerId);
+}
+
 bool clicker_sm_ConsumeEvent(Event* event) {
     switch (event->type) {
         case EventType_CLICKER_DESTROY:
@@ -234,7 +246,7 @@ bool clicker_sm_ConsumeEvent(Event* event) {
             return NetworkCommandHandler((NetworkDataPack*) event->ptrData);
 
         case EventType_CLICKER_START_PROVISION:
-            ubusagent_SendGeneratePskMessage(event->intData);
+            handleStartProvision(event->intData);
             return true;
 
         case EventType_PSK_OBTAINED:

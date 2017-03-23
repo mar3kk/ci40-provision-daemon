@@ -87,16 +87,7 @@ static void StartProvisionCallback(void)
     int clickerId = g_array_index(_connectedClickersId, int, selectedClickerIndex);
     g_mutex_unlock(&mutex);
 
-    Clicker* clicker = clicker_AcquireOwnership(clickerId);
-    if (clicker == NULL) {
-        g_critical( "No clicker with id:%d, this is internal error.", clickerId);
-        return;
-    }
-    clicker->provisioningInProgress = true;
-    clicker_ReleaseOwnership(clicker);
-
     event_PushEventWithInt(EventType_CLICKER_START_PROVISION, clickerId);
-    event_PushEventWithInt(EventType_HISTORY_REMOVE, clickerId);
 }
 
 void controls_init(bool enableButtons) {
