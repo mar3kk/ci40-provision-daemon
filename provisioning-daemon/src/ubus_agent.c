@@ -136,6 +136,7 @@ static UBusMemoryBlock* createUBusMemoryBlock() {
     //Note: Should be called from critical section
     UBusMemoryBlock* result = g_malloc0(sizeof(UBusMemoryBlock));
     _uBusRequestMemory = g_slist_prepend(_uBusRequestMemory, result);
+    memset(&result->replyBloob, 0, sizeof(result->replyBloob));
     blob_buf_init(&result->replyBloob, 0);
     result->toDelete = false;
     return result;
@@ -157,15 +158,26 @@ static int SetClickerNameMethodHandler(struct ubus_context *ctx, struct ubus_obj
 
     blobmsg_parse(_SetClickerNamePolicy, SET_CLICKER_NAME_LAST, args, blob_data(msg), blob_len(msg));
 
-    int clickerID = blobmsg_get_u32(args[SET_CLICKER_NAME_CLICKER_ID]);
+    int clickerID;
+    if (args[SET_CLICKER_NAME_CLICKER_ID]) {
+        clickerID = blobmsg_get_u32(args[SET_CLICKER_NAME_CLICKER_ID]);
+    } else {
+        return 1;
+    }
 
     Clicker *clicker = clicker_AcquireOwnership(clickerID);
     if (clicker == NULL) {
         g_critical("uBusAgent: No clicker with id %d", clickerID);
-        return 1;
+        return UBUS_STATUS_NO_DATA;
     }
 
-    char *clickerName = blobmsg_get_string(args[SET_CLICKER_NAME_CLICKER_NAME]);
+    char *clickerName;
+    if (args[SET_CLICKER_NAME_CLICKER_NAME]) {
+        clickerName = blobmsg_get_string(args[SET_CLICKER_NAME_CLICKER_NAME]);
+    } else {
+        clicker_ReleaseOwnership(clicker);
+        return UBUS_STATUS_NO_DATA;
+    }
 
     g_free(clicker->name);
     int size = strlen(clickerName);
@@ -175,7 +187,7 @@ static int SetClickerNameMethodHandler(struct ubus_context *ctx, struct ubus_obj
 
     clicker_ReleaseOwnership(clicker);
 
-    return 0;
+    return UBUS_STATUS_OK;
 }
 
 static int SelectMethodHandler(struct ubus_context *ctx, struct ubus_object *obj, struct ubus_request_data *req,
@@ -187,8 +199,11 @@ static int SelectMethodHandler(struct ubus_context *ctx, struct ubus_object *obj
     blobmsg_parse(_SelectPolicy, ARRAY_SIZE(_SelectPolicy), argBuffer, blob_data(msg), blob_len(msg));
 
     uint32_t clickerId = 0xffffffff;
-    if (argBuffer[SELECT_CLICKER_ID])
+    if (argBuffer[SELECT_CLICKER_ID]) {
         clickerId = blobmsg_get_u32(argBuffer[SELECT_CLICKER_ID]);
+    } else {
+        return UBUS_STATUS_NO_DATA;
+    }
 
     g_info("uBusAgent: Select, move to clickerId:%d", clickerId);
 
@@ -289,7 +304,7 @@ static int GetStateMethodHandler(struct ubus_context *ctx, struct ubus_object *o
     return UBUS_STATUS_OK;
 }
 
-static void GeneratePskResponseHandler(struct ubus_request *req, int type, struct blob_attr *msg)
+static int GeneratePskResponseHandler(struct ubus_request *req, int type, struct blob_attr *msg)
 {
     g_critical("Got: %p", msg);
     struct blob_attr *args[GENERATE_PSK_RESPONSE_MAX];
@@ -297,38 +312,46 @@ static void GeneratePskResponseHandler(struct ubus_request *req, int type, struc
     blobmsg_parse(_GeneratePskResponsePolicy, GENERATE_PSK_RESPONSE_MAX, args, blob_data(msg), blob_len(msg));
     UBusMemoryBlock* block = (UBusMemoryBlock*)req->priv;
 
-    char *error = blobmsg_get_string(args[GENERATE_PSK_RESPONSE_ERROR]);
-    if (error)
-    {
+    char *error = NULL;
+    if (args[GENERATE_PSK_RESPONSE_ERROR]) {
+        error = blobmsg_get_string(args[GENERATE_PSK_RESPONSE_ERROR]);
+    }
+
+    if (error) {
         g_critical("uBusAgent: Error while generating PSK : %s", error);
         PreSharedKey* eventData = g_new0(PreSharedKey, 1);
         eventData->clickerId = block->clickerId;
         event_PushEventWithPtr(EventType_PSK_OBTAINED, eventData, true);
         block->toDelete = true;
-        return;
+        return UBUS_STATUS_UNKNOWN_ERROR;
     }
 
-    char *psk = blobmsg_get_string(args[GENERATE_PSK_RESPONSE_PSK_SECRET]);
+    char *psk = NULL;
+    if (args[GENERATE_PSK_RESPONSE_PSK_SECRET]) {
+        psk = blobmsg_get_string(args[GENERATE_PSK_RESPONSE_PSK_SECRET]);
+    }
 
-    if (!psk)
-    {
+    if (!psk) {
         g_critical("uBusAgent: UNKNOWN PSK");
         PreSharedKey* eventData = g_new0(PreSharedKey, 1);
         eventData->clickerId = block->clickerId;
         event_PushEventWithPtr(EventType_PSK_OBTAINED, eventData, true);
         block->toDelete = true;
-        return;
+        return UBUS_STATUS_UNKNOWN_ERROR;
     }
 
-    char *identity = blobmsg_get_string(args[GENERATE_PSK_RESPONSE_PSK_IDENTITY]);
-    if (!identity)
-    {
+    char *identity;
+    if (args[GENERATE_PSK_RESPONSE_PSK_IDENTITY]) {
+        identity = blobmsg_get_string(args[GENERATE_PSK_RESPONSE_PSK_IDENTITY]);
+    }
+
+    if (!identity) {
         g_critical("uBusAgent: UNKNOWN PSK");
         PreSharedKey* eventData = g_new0(PreSharedKey, 1);
         eventData->clickerId = block->clickerId;
         event_PushEventWithPtr(EventType_PSK_OBTAINED, eventData, true);
         block->toDelete = true;
-        return;
+        return UBUS_STATUS_UNKNOWN_ERROR;
     }
 
     g_message("uBusAgent: Obtained PSK: %s and IDENTITY: %s", psk, identity);
@@ -346,6 +369,7 @@ static void GeneratePskResponseHandler(struct ubus_request *req, int type, struc
 
     event_PushEventWithPtr(EventType_PSK_OBTAINED, eventData, true);
     block->toDelete = true;
+    return UBUS_STATUS_OK;
 }
 
 void HelperTimeoutHandler(struct uloop_timeout *t)
