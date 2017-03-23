@@ -53,7 +53,7 @@ typedef struct {
     uint16_t port; /** Port on which socket is bound */
 } ConnectionData;
 
-static GList* _connectionsList = NULL;
+static GList* _ConnectionsList = NULL;
 
 static int _MasterSocket;
 static unsigned long _LastKeepAliveSendTime = 0;
@@ -61,7 +61,7 @@ static unsigned long _LastCheckConnectionsTime = 0;
 static int _IDCounter = 0; /**< Used to give UIDs for newly created clickers */
 
 void ConnectionDataToString(ConnectionData* connection, char* buf, size_t bufLen) {
-    snprintf(buf, bufLen, "ClickerID:%d, ip:[%s], socket:%d, port:%d, keepAliveTime:%lu", connection->clickerID,
+    snprintf(buf, bufLen, "ClickerID:%d, ip:[%s], socket:%d, port:%d, keepAliveTime:%llu", connection->clickerID,
             connection->ip, connection->socket, connection->port, connection->lastKeepAliveTime);
 }
 
@@ -73,7 +73,7 @@ static void HandleDisconnect(ConnectionData* connection) {
 
     event_PushEventWithInt(EventType_CLICKER_DESTROY, connection->clickerID);
 
-    _connectionsList = g_list_remove(_connectionsList, connection);
+    _ConnectionsList = g_list_remove(_ConnectionsList, connection);
     g_free(connection);
 }
 
@@ -101,7 +101,7 @@ static void AcceptConnection() {
         strlcpy(connection->ip, "::1", INET6_ADDRSTRLEN);
     }
 
-    _connectionsList = g_list_prepend(_connectionsList, connection);
+    _ConnectionsList = g_list_prepend(_ConnectionsList, connection);
 
     event_PushEventWithInt(EventType_CLICKER_CREATE, connection->clickerID);
 
@@ -127,7 +127,7 @@ static int HandleRead(fd_set* readFS) {
     int socket = 0;
     size_t valread = 0;
 
-    GList* tmpList = g_list_copy(_connectionsList);
+    GList* tmpList = g_list_copy(_ConnectionsList);
     uint8_t buffer[1024];
     for (GList* iter = tmpList; iter != NULL; iter = iter->next) {
         ConnectionData* connection = (ConnectionData*) iter->data;
@@ -210,7 +210,7 @@ static void CheckConnections(void) {
     if (currentTimeMillis - _LastCheckConnectionsTime > CHECK_CONNECTIONS_INTERVAL_MS) {
         _LastCheckConnectionsTime = currentTimeMillis;
 
-        for (GList* iter = _connectionsList; iter != NULL; iter = iter->next) {
+        for (GList* iter = _ConnectionsList; iter != NULL; iter = iter->next) {
             ConnectionData* connection = (ConnectionData*) iter->data;
             if (currentTimeMillis - connection->lastKeepAliveTime > KEEP_ALIVE_TIMEOUT_MS) HandleDisconnect(connection);
         }
@@ -221,7 +221,7 @@ static void SendKeepAlive(void) {
     unsigned long currentTimeMillis = g_get_monotonic_time() / 1000;
     if (currentTimeMillis - _LastKeepAliveSendTime > KEEP_ALIVE_INTERVAL_MS) {
         _LastKeepAliveSendTime = currentTimeMillis;
-        for (GList* iter = _connectionsList; iter != NULL; iter = iter->next) {
+        for (GList* iter = _ConnectionsList; iter != NULL; iter = iter->next) {
             SendCommand(iter->data, NetworkCommand_KEEP_ALIVE);
         }
     }
@@ -234,7 +234,7 @@ void con_ProcessConnections(void) {
     FD_SET(_MasterSocket, &readFS);
     int maxSD = _MasterSocket;
 
-    GList* iter = _connectionsList;
+    GList* iter = _ConnectionsList;
     while (iter != NULL) {
         ConnectionData* data = (ConnectionData*) iter->data;
         int socket = data->socket;
@@ -274,7 +274,7 @@ gint CompareConnectionByClickerId(gpointer a, gpointer b) {
 
 ConnectionData* ConnectionForClickerId(int clickerID) {
     ConnectionData tmp = { .clickerID = clickerID };
-    GList* found = g_list_find_custom(_connectionsList, &tmp, (GCompareFunc) CompareConnectionByClickerId);
+    GList* found = g_list_find_custom(_ConnectionsList, &tmp, (GCompareFunc) CompareConnectionByClickerId);
     return found != NULL ? found->data : NULL;
 }
 

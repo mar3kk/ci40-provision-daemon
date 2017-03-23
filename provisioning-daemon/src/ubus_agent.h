@@ -40,7 +40,7 @@ typedef struct  {
  * @brief Init ubus mechanism, register objects
  */
 bool ubusagent_Init(void);
-void ubusagent_Close(void);
+void ubusagent_Destroy(void);
 
 bool ubusagent_EnableRemoteControl(void);
 

@@ -29,9 +29,9 @@
  */
 #include "event.h"
 
-static GQueue* eventsQueue = NULL;
-static GMutex mutex;
-static int _nextEventId = 0;
+static GQueue* _EventsQueue = NULL;
+static GMutex _Mutex;
+static int _NextEventId = 0;
 
 char* EventTypeToString(EventType type) {
     switch(type) {
@@ -71,52 +71,52 @@ char* EventTypeToString(EventType type) {
 }
 
 void event_Init(void) {
-    eventsQueue = g_queue_new();
-    g_mutex_init(&mutex);
+    _EventsQueue = g_queue_new();
+    g_mutex_init(&_Mutex);
 }
 
 void event_Shutdown(void) {
-    if (eventsQueue != NULL) {
-        g_queue_free(eventsQueue);
-        g_mutex_clear(&mutex);
+    if (_EventsQueue != NULL) {
+        g_queue_free(_EventsQueue);
+        g_mutex_clear(&_Mutex);
     }
-    eventsQueue = NULL;
+    _EventsQueue = NULL;
 }
 
 void event_PushEventWithInt(EventType type, int data) {
-    g_mutex_lock(&mutex);
+    g_mutex_lock(&_Mutex);
     Event* event = g_new(Event, 1);
-    event->id = ++_nextEventId;
+    event->id = ++_NextEventId;
     event->type = type;
     event->intData  =data;
     event->freeDataPtrOnRelease = false;
-    g_queue_push_tail(eventsQueue, event);
-    g_mutex_unlock(&mutex);
+    g_queue_push_tail(_EventsQueue, event);
+    g_mutex_unlock(&_Mutex);
     g_message("[Event:%d] eventPtr:%p type:%s, int data:%d", event->id, event, EventTypeToString(type), data);
 }
 
 void event_PushEventWithPtr(EventType type, void* dataPtr, bool freeDataOnRelease) {
-    g_mutex_lock(&mutex);
+    g_mutex_lock(&_Mutex);
     Event* event = g_new(Event, 1);
-    event->id = ++_nextEventId;
+    event->id = ++_NextEventId;
     event->type = type;
     event->ptrData = dataPtr;
     event->freeDataPtrOnRelease = freeDataOnRelease;
 
-    g_queue_push_tail(eventsQueue, event);
-    g_mutex_unlock(&mutex);
+    g_queue_push_tail(_EventsQueue, event);
+    g_mutex_unlock(&_Mutex);
 
     g_message("[Event:%d] eventPtr:%p, type:%s, dataPtr:%p", event->id, event, EventTypeToString(type), dataPtr);
 }
 
 Event* event_PopEvent(void) {
-    g_mutex_lock(&mutex);
-    Event* result = g_queue_pop_head(eventsQueue);
-    g_mutex_unlock(&mutex);
+    g_mutex_lock(&_Mutex);
+    Event* result = g_queue_pop_head(_EventsQueue);
+    g_mutex_unlock(&_Mutex);
     return result;
 }
 
-void event_releaseEvent(Event** event) {
+void event_ReleaseEvent(Event** event) {
     if (*event != NULL) {
         if ((*event)->freeDataPtrOnRelease) {
             g_debug("[event:%d] release event DATA ptr: %p", (*event)->id, (*event)->ptrData);

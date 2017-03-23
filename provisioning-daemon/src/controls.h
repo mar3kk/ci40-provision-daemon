@@ -35,8 +35,8 @@
 #include <glib.h>
 #include "event.h"
 
-void controls_init(bool enableButtons);
-void controls_shutdown();
+void controls_Init(bool enableButtons);
+void controls_Shutdown();
 
 void controls_Update(void);
 bool controls_ConsumeEvent(Event* event);

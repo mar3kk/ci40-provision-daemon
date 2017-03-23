@@ -80,8 +80,7 @@
  */
 static volatile bool _KeepRunning = true;
 
-FILE * g_debugStream = NULL;
-//int g_debugLevel = LOG_INFO;
+static FILE * _DebugStream = NULL;
 
 static config_t _Cfg;
 
@@ -96,7 +95,7 @@ pd_Config _PDConfig = {
     .remoteProvisionControl = false
 };
 
-GMutex logMutex;
+GMutex _LogMutex;
 
 /***************************************************************************************************
  * Implementation
@@ -297,19 +296,19 @@ static int ParseCommandArgs(int argc, char *argv[], const char **fptr)
 
 void CleanupOnExit(void)
 {
-    ubusagent_Close();
-    bi_releaseConst();
-    controls_shutdown();
+    ubusagent_Destroy();
+    bi_ReleaseConst();
+    controls_Shutdown();
 
     config_destroy(&_Cfg);
-    g_mutex_clear(&logMutex);
-    history_destroy();
+    g_mutex_clear(&_LogMutex);
+    history_Destroy();
 }
 
 static void LogHandlerCallback (const gchar *log_domain, GLogLevelFlags log_level, const gchar *message,
         gpointer user_data) {
-    g_mutex_lock(&logMutex);
-    if (g_debugStream == NULL) {
+    g_mutex_lock(&_LogMutex);
+    if (_DebugStream == NULL) {
         //use standard console logging
         g_log_default_handler(log_domain, log_level, message, user_data);
 
@@ -319,9 +318,9 @@ static void LogHandlerCallback (const gchar *log_domain, GLogLevelFlags log_leve
         time_t currentTime = time(NULL);
         char buffer[TIME_BUFFER_SIZE] = { 0 };
         strftime(buffer, TIME_BUFFER_SIZE, "%x %X", localtime(&currentTime));
-        fprintf(g_debugStream, "[%s] %s ", buffer, message);
+        fprintf(_DebugStream, "[%s] %s ", buffer, message);
     }
-    g_mutex_unlock(&logMutex);
+    g_mutex_unlock(&_LogMutex);
 }
 
 static void BlackHoleLogHandlerCallback (const gchar *log_domain, GLogLevelFlags log_level, const gchar *message,
@@ -330,7 +329,7 @@ static void BlackHoleLogHandlerCallback (const gchar *log_domain, GLogLevelFlags
 }
 
 static void InitLogger() {
-    g_mutex_init(&logMutex);
+    g_mutex_init(&_LogMutex);
     g_log_set_handler (NULL, G_LOG_LEVEL_MASK | G_LOG_FLAG_RECURSION,
             BlackHoleLogHandlerCallback, NULL);
     g_log_set_handler (NULL, G_LOG_LEVEL_WARNING| G_LOG_LEVEL_CRITICAL | G_LOG_FLAG_RECURSION,
@@ -391,7 +390,7 @@ int main(int argc, char **argv)
         logFile = fopen(fptr, "w");
 
         if (logFile != NULL)
-            g_debugStream  = logFile;
+            _DebugStream  = logFile;
         else
             g_critical("Failed to create or open %s file", fptr);
     }
@@ -404,9 +403,9 @@ int main(int argc, char **argv)
     sigaction(SIGINT, &action, NULL);
 
     srand(time(NULL));
-    bi_generateConst();
-    history_init();
-    controls_init(_PDConfig.localProvisionControl != 0);
+    bi_GenerateConst();
+    history_Init();
+    controls_Init(_PDConfig.localProvisionControl != 0);
     clicker_Init();
 
     if (ubusagent_Init() == false)
@@ -446,7 +445,7 @@ int main(int argc, char **argv)
             clicker_sm_ConsumeEvent(event);
             history_ConsumeEvent(event);
 
-            event_releaseEvent(&event);
+            event_ReleaseEvent(&event);
         }
         //-----------------
 

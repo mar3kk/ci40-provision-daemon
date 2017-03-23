@@ -67,7 +67,7 @@ static void GenerateSharedClickerKey(int clickerId)
         return;
     }
 
-    clicker->sharedKey = dh_completeExchangeData(clicker->keysExchanger, clicker->remoteKey, clicker->remoteKeyLength);
+    clicker->sharedKey = dh_CompleteExchangeData(clicker->keysExchanger, clicker->remoteKey, clicker->remoteKeyLength);
     clicker->sharedKeyLength = clicker->keysExchanger->pModuleLength;
 
     g_message("Generated Shared Key");
@@ -103,7 +103,7 @@ void TryToSendPsk(int clickerId)
         memcpy(_DeviceServerConfig.bootstrapUri, _PDConfig.bootstrapUri, strnlen(_PDConfig.bootstrapUri, 200));
 
         uint8_t dataLen = 0;
-        uint8_t *encodedData = softap_encodeBytes((uint8_t *)&_DeviceServerConfig, sizeof(_DeviceServerConfig) ,
+        uint8_t *encodedData = softap_EncodeBytes((uint8_t *)&_DeviceServerConfig, sizeof(_DeviceServerConfig) ,
                 clicker->sharedKey, &dataLen);
         NetworkDataPack* netData = con_BuildNetworkDataPack(clicker->clickerID, NetworkCommand_DEVICE_SERVER_CONFIG,
                 encodedData, dataLen, true);
@@ -116,7 +116,7 @@ void TryToSendPsk(int clickerId)
         strlcpy((char*)&_NetworkConfig.endpointName, clicker->name, sizeof(_NetworkConfig.endpointName));
 
         dataLen = 0;
-        encodedData = softap_encodeBytes((uint8_t *)&_NetworkConfig, sizeof(_NetworkConfig) , clicker->sharedKey, &dataLen);
+        encodedData = softap_EncodeBytes((uint8_t *)&_NetworkConfig, sizeof(_NetworkConfig) , clicker->sharedKey, &dataLen);
         netData = con_BuildNetworkDataPack(clicker->clickerID, NetworkCommand_NETWORK_CONFIG, encodedData, dataLen, true);
         event_PushEventWithPtr(EventType_CONNECTION_SEND_COMMAND, netData, true);
         G_FREE_AND_NULL(encodedData);
@@ -155,7 +155,7 @@ void GenerateLocalClickerKey(int clickerId) {
         return;
     }
     DiffieHellmanKeysExchanger *keysExchanger = clicker->keysExchanger;
-    clicker->localKey = (void*) dh_generateExchangeData(keysExchanger);
+    clicker->localKey = (void*) dh_GenerateExchangeData(keysExchanger);
     clicker->localKeyLength = keysExchanger->pModuleLength;
 
     g_message("Generated local Key");
@@ -220,7 +220,7 @@ static void GenerateNameForClicker(int clickerId)
     }
 }
 
-static void handleStartProvision(int clickerId) {
+static void HandleStartProvision(int clickerId) {
     Clicker* clicker = clicker_AcquireOwnership(clickerId);
     if (clicker == NULL) {
         g_critical("No clicker with id:%d, this is internal error.", clickerId);
@@ -246,7 +246,7 @@ bool clicker_sm_ConsumeEvent(Event* event) {
             return NetworkCommandHandler((NetworkDataPack*) event->ptrData);
 
         case EventType_CLICKER_START_PROVISION:
-            handleStartProvision(event->intData);
+            HandleStartProvision(event->intData);
             return true;
 
         case EventType_PSK_OBTAINED:

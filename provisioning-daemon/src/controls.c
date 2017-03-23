@@ -37,62 +37,61 @@
 #define LED_SLOW_BLINK_INTERVAL_MS              (500)
 #define LED_FAST_BLINK_INTERVAL_MS              (100)
 #define TIME_TO_DISCONNECT_AFTER_PROVISION      3000
+
 /**
  * Time in millis of last led state has been changed.
  */
 static unsigned long _LastBlinkTime = 0;
-
-static bool g_activeLedOn = true;
-
-static GArray* _connectedClickersId;
-static int selectedClickerIndex = -1;
-static GMutex mutex;
+static bool _ActiveLedOn = true;
+static GArray* _ConnectedClickersId;
+static int _SelectedClickerIndex = -1;
+static GMutex _Mutex;
 
 // Send ENABLE_HIGHLIGHT command to active clicker and DISABLE_HIGHLIGHT to inactive clickers
 static void UpdateHighlights(void) {
-    g_mutex_lock(&mutex);
-    for (guint t = 0; t < _connectedClickersId->len; t++) {
-        NetworkCommand cmdToSend = (t == selectedClickerIndex) ?
+    g_mutex_lock(&_Mutex);
+    for (guint t = 0; t < _ConnectedClickersId->len; t++) {
+        NetworkCommand cmdToSend = (t == _SelectedClickerIndex) ?
                 NetworkCommand_ENABLE_HIGHLIGHT : NetworkCommand_DISABLE_HIGHLIGHT;
-        int clickerId = g_array_index(_connectedClickersId, int, t);
+        int clickerId = g_array_index(_ConnectedClickersId, int, t);
         NetworkDataPack* netData = con_BuildNetworkDataPack(clickerId, cmdToSend, NULL, 0, false);
         event_PushEventWithPtr(EventType_CONNECTION_SEND_COMMAND, netData, true);
     }
-    g_mutex_unlock(&mutex);
+    g_mutex_unlock(&_Mutex);
 }
 
 static void SelectNextClickerCallback(void)
 {
-    g_mutex_lock(&mutex);
-    selectedClickerIndex ++;
-    if (selectedClickerIndex >= _connectedClickersId->len) {
-        selectedClickerIndex = (_connectedClickersId->len > 0) ? 0 : -1;
+    g_mutex_lock(&_Mutex);
+    _SelectedClickerIndex ++;
+    if (_SelectedClickerIndex >= _ConnectedClickersId->len) {
+        _SelectedClickerIndex = (_ConnectedClickersId->len > 0) ? 0 : -1;
     }
-    if (selectedClickerIndex == -1) {
+    if (_SelectedClickerIndex == -1) {
         g_message("No clicker is selected now.");
     } else {
-        g_message("Selected Clicker ID : %d", g_array_index(_connectedClickersId, int, selectedClickerIndex));
+        g_message("Selected Clicker ID : %d", g_array_index(_ConnectedClickersId, int, _SelectedClickerIndex));
     }
-    g_mutex_unlock(&mutex);
+    g_mutex_unlock(&_Mutex);
     UpdateHighlights();
 }
 
 static void StartProvisionCallback(void)
 {
-    if (selectedClickerIndex < 0 || _connectedClickersId->len == 0) {
+    if (_SelectedClickerIndex < 0 || _ConnectedClickersId->len == 0) {
         g_critical( "Can't start provision, no clicker is selected!");
         return;
     }
-    g_mutex_lock(&mutex);
-    int clickerId = g_array_index(_connectedClickersId, int, selectedClickerIndex);
-    g_mutex_unlock(&mutex);
+    g_mutex_lock(&_Mutex);
+    int clickerId = g_array_index(_ConnectedClickersId, int, _SelectedClickerIndex);
+    g_mutex_unlock(&_Mutex);
 
     event_PushEventWithInt(EventType_CLICKER_START_PROVISION, clickerId);
 }
 
-void controls_init(bool enableButtons) {
-    g_mutex_init(&mutex);
-    _connectedClickersId = g_array_new(FALSE, FALSE, sizeof(int));
+void controls_Init(bool enableButtons) {
+    g_mutex_init(&_Mutex);
+    _ConnectedClickersId = g_array_new(FALSE, FALSE, sizeof(int));
 
     if (enableButtons) {
         g_message( "[Setup] Enabling button controls.");
@@ -105,10 +104,10 @@ void controls_init(bool enableButtons) {
     }
 }
 
-void controls_shutdown() {
-    g_array_free(_connectedClickersId, TRUE);
+void controls_Shutdown() {
+    g_array_free(_ConnectedClickersId, TRUE);
     switch_release();
-    g_mutex_clear(&mutex);
+    g_mutex_clear(&_Mutex);
 }
 
 static void SetLeds(void)
@@ -116,10 +115,10 @@ static void SetLeds(void)
     uint8_t mask = 0;
     int i = 0;
 
-    g_mutex_lock(&mutex);
-    int clickersCount = _connectedClickersId->len;
-    int selectedIndex = selectedClickerIndex;
-    g_mutex_unlock(&mutex);
+    g_mutex_lock(&_Mutex);
+    int clickersCount = _ConnectedClickersId->len;
+    int selectedIndex = _SelectedClickerIndex;
+    g_mutex_unlock(&_Mutex);
 
     if (clickersCount == 0)
     {
@@ -132,7 +131,7 @@ static void SetLeds(void)
     for (i = 0; i < clickersCount; i++)
         mask |= 1 << i;
 
-    if ((selectedIndex >= 0) && (selectedIndex < 8) && g_activeLedOn) {
+    if ((selectedIndex >= 0) && (selectedIndex < 8) && _ActiveLedOn) {
         mask ^= 1 << selectedIndex;
     }
 
@@ -140,14 +139,14 @@ static void SetLeds(void)
 }
 
 void CheckForFinishedProvisionings(void) {
-    g_mutex_lock(&mutex);
-    int count = _connectedClickersId->len;
-    g_mutex_unlock(&mutex);
+    g_mutex_lock(&_Mutex);
+    int count = _ConnectedClickersId->len;
+    g_mutex_unlock(&_Mutex);
 
     for (guint t = 0; t < count; t++) {
-        g_mutex_lock(&mutex);
-        int clickerId = g_array_index(_connectedClickersId, int, t);
-        g_mutex_unlock(&mutex);
+        g_mutex_lock(&_Mutex);
+        int clickerId = g_array_index(_ConnectedClickersId, int, t);
+        g_mutex_unlock(&_Mutex);
         Clicker* clicker = clicker_AcquireOwnership(clickerId);
         if (clicker == NULL) {
             g_critical( "No clicker with id:%d, this is internal error.", clickerId);
@@ -183,7 +182,7 @@ void controls_Update(void) {
     unsigned long currentTime = g_get_monotonic_time() / 1000;
     if (currentTime - _LastBlinkTime > interval) {
         _LastBlinkTime = currentTime;
-        g_activeLedOn = !g_activeLedOn;
+        _ActiveLedOn = !_ActiveLedOn;
     }
 
     SetLeds();
@@ -191,67 +190,67 @@ void controls_Update(void) {
 }
 
 static void RemoveClickerWithID(int clickerID) {
-    g_mutex_lock(&mutex);
+    g_mutex_lock(&_Mutex);
     guint foundIndex = -1;
-    for(guint t = 0; t < _connectedClickersId->len; t++) {
-        if (g_array_index(_connectedClickersId, int, t) == clickerID) {
+    for(guint t = 0; t < _ConnectedClickersId->len; t++) {
+        if (g_array_index(_ConnectedClickersId, int, t) == clickerID) {
             foundIndex = t;
             break;
         }
     }
     if (foundIndex >= 0) {
-        g_array_remove_index(_connectedClickersId, foundIndex);
+        g_array_remove_index(_ConnectedClickersId, foundIndex);
 
-        if (selectedClickerIndex >= _connectedClickersId->len) {
-            selectedClickerIndex = _connectedClickersId->len - 1;
-            if (selectedClickerIndex == -1) {
+        if (_SelectedClickerIndex >= _ConnectedClickersId->len) {
+            _SelectedClickerIndex = _ConnectedClickersId->len - 1;
+            if (_SelectedClickerIndex == -1) {
                 g_message("No clicker is selected now.");
             } else {
-                g_message("Selected Clicker ID : %d", g_array_index(_connectedClickersId, int, selectedClickerIndex));
+                g_message("Selected Clicker ID : %d", g_array_index(_ConnectedClickersId, int, _SelectedClickerIndex));
             }
         }
     }
-    g_mutex_unlock(&mutex);
+    g_mutex_unlock(&_Mutex);
 }
 
 static void SelectClickerWithId(int clickerId) {
-    g_mutex_lock(&mutex);
-    for (guint t = 0; t < _connectedClickersId->len; t++) {
-        if (g_array_index(_connectedClickersId, int, t) == clickerId) {
-            selectedClickerIndex = t;
+    g_mutex_lock(&_Mutex);
+    for (guint t = 0; t < _ConnectedClickersId->len; t++) {
+        if (g_array_index(_ConnectedClickersId, int, t) == clickerId) {
+            _SelectedClickerIndex = t;
             g_message( "Selected Clicker ID : %d", clickerId);
             break;
         }
     }
-    g_mutex_unlock(&mutex);
+    g_mutex_unlock(&_Mutex);
 }
 
 int controls_GetSelectedClickerId() {
-    g_mutex_lock(&mutex);
-    int result = (selectedClickerIndex < 0) ? -1 : g_array_index(_connectedClickersId, int, selectedClickerIndex);
-    g_mutex_unlock(&mutex);
+    g_mutex_lock(&_Mutex);
+    int result = (_SelectedClickerIndex < 0) ? -1 : g_array_index(_ConnectedClickersId, int, _SelectedClickerIndex);
+    g_mutex_unlock(&_Mutex);
     return result;
 }
 
 GArray* controls_GetAllClickersIds() {
-    g_mutex_lock(&mutex);
+    g_mutex_lock(&_Mutex);
     GArray* result = g_array_new(FALSE, FALSE, sizeof(int));
-    int* pos = &g_array_index(_connectedClickersId, int, 0);
-    g_array_append_vals(result, pos, _connectedClickersId->len);
-    g_mutex_unlock(&mutex);
+    int* pos = &g_array_index(_ConnectedClickersId, int, 0);
+    g_array_append_vals(result, pos, _ConnectedClickersId->len);
+    g_mutex_unlock(&_Mutex);
     return result;
 }
 
 bool controls_ConsumeEvent(Event* event) {
     switch(event->type) {
         case EventType_CLICKER_CREATE:
-            g_mutex_lock(&mutex);
-            g_array_append_val(_connectedClickersId, event->intData);
-            if (selectedClickerIndex == -1) {
-                selectedClickerIndex = 0;
-                g_message( "Selected Clicker ID : %d", g_array_index(_connectedClickersId, int, selectedClickerIndex));
+            g_mutex_lock(&_Mutex);
+            g_array_append_val(_ConnectedClickersId, event->intData);
+            if (_SelectedClickerIndex == -1) {
+                _SelectedClickerIndex = 0;
+                g_message( "Selected Clicker ID : %d", g_array_index(_ConnectedClickersId, int, _SelectedClickerIndex));
             }
-            g_mutex_unlock(&mutex);
+            g_mutex_unlock(&_Mutex);
             UpdateHighlights();
             return true;
 

@@ -40,14 +40,13 @@
 /**
  * Keeps a HEAD for the list of connected clickers
  */
-//TODO: I'm certain that this should be hashmap
-static GQueue* clickersQueue = NULL;
+static GQueue* _ClickersQueue = NULL;
 
 /** All operations are sync on this mutex */
-static GMutex mutex;
+static GMutex _Mutex;
 
 static void Destroy(Clicker *clicker) {
-    dh_release(&clicker->keysExchanger);
+    dh_Release(&clicker->keysExchanger);
     G_FREE_AND_NULL(clicker->localKey);
     G_FREE_AND_NULL(clicker->remoteKey);
     G_FREE_AND_NULL(clicker->sharedKey);
@@ -64,14 +63,14 @@ static void ReleaseClickerIfNotOwned(Clicker* clicker) {
         return;
     }
     //check for logic error, if ownershipCount == 0, this clicker can't be in clickersQueue
-    if (g_queue_remove(clickersQueue, clicker) == TRUE) {
+    if (g_queue_remove(_ClickersQueue, clicker) == TRUE) {
         g_critical("Internal error: Clicker with id:%d has ownershipCount = 0, but it's still in queue! Forced remove",
                 clicker->clickerID);
     }
     Destroy(clicker);
 }
 
-gint compareClickerById(gpointer a, gpointer b) {
+gint CompareClickerById(gpointer a, gpointer b) {
     Clicker* clicker1 = (Clicker*)a;
     Clicker* clicker2 = (Clicker*)b;
     return clicker1->clickerID - clicker2->clickerID;
@@ -80,18 +79,17 @@ gint compareClickerById(gpointer a, gpointer b) {
 static Clicker *InnerGetClickerByID(int id, bool doLock)
 {
     if (doLock)
-        g_mutex_lock(&mutex);
+        g_mutex_lock(&_Mutex);
 
     Clicker tmp;
     tmp.clickerID = id;
-    GList* found = g_queue_find_custom(clickersQueue, &tmp, (GCompareFunc)compareClickerById);
+    GList* found = g_queue_find_custom(_ClickersQueue, &tmp, (GCompareFunc)CompareClickerById);
     Clicker* result = found != NULL ? found->data : NULL;
 
     if (doLock)
-        g_mutex_unlock(&mutex);
+        g_mutex_unlock(&_Mutex);
     return result;
 }
-
 
 void CreateNewClicker(int id)
 {
@@ -99,7 +97,7 @@ void CreateNewClicker(int id)
 
     newClicker->clickerID = id;
     newClicker->taskInProgress = false;
-    newClicker->keysExchanger = dh_newKeyExchanger((char*)g_KeyBuffer, P_MODULE_LENGTH, CRYPTO_G_MODULE, GenerateRandomX);
+    newClicker->keysExchanger = dh_NewKeyExchanger((char*)g_KeyBuffer, P_MODULE_LENGTH, CRYPTO_G_MODULE, GenerateRandomX);
     newClicker->localKey = NULL;
     newClicker->remoteKey = NULL;
     newClicker->sharedKey = NULL;
@@ -113,10 +111,10 @@ void CreateNewClicker(int id)
     newClicker->name = g_malloc0(COMMAND_ENDPOINT_NAME_LENGTH);
     g_mutex_init(&newClicker->ownershipLock);
 
-    g_mutex_lock(&mutex);
-    g_queue_push_tail(clickersQueue, newClicker);
+    g_mutex_lock(&_Mutex);
+    g_queue_push_tail(_ClickersQueue, newClicker);
     newClicker->ownershipsCount ++;
-    g_mutex_unlock(&mutex);
+    g_mutex_unlock(&_Mutex);
 }
 
 void RemoveFromCollection(int clickerID)
@@ -126,45 +124,45 @@ void RemoveFromCollection(int clickerID)
         return;
     }
     g_debug("clicker_Release start");
-    g_mutex_lock(&mutex);
+    g_mutex_lock(&_Mutex);
 
-    if (g_queue_remove(clickersQueue, clicker) == TRUE) {
+    if (g_queue_remove(_ClickersQueue, clicker) == TRUE) {
         clicker->ownershipsCount --;
     } else {
         g_critical("Internal error: Tried to remove clicker which is not a part of collection!");
     }
 
     ReleaseClickerIfNotOwned(clicker);
-    g_mutex_unlock(&mutex);
+    g_mutex_unlock(&_Mutex);
 }
 
 void clicker_Init(void)
 {
-    clickersQueue = g_queue_new();
-    g_mutex_init(&mutex);
+    _ClickersQueue = g_queue_new();
+    g_mutex_init(&_Mutex);
 }
 
 void clicker_Shutdown(void) {
-    g_queue_free(clickersQueue);
-    g_mutex_clear(&mutex);
-    clickersQueue = NULL;
+    g_queue_free(_ClickersQueue);
+    g_mutex_clear(&_Mutex);
+    _ClickersQueue = NULL;
 }
 
 unsigned int clicker_GetClickersCount(void)
 {
-    g_mutex_lock(&mutex);
-    int result = g_queue_get_length(clickersQueue);
-    g_mutex_unlock(&mutex);
+    g_mutex_lock(&_Mutex);
+    int result = g_queue_get_length(_ClickersQueue);
+    g_mutex_unlock(&_Mutex);
     return result;
 }
 
 Clicker *clicker_AcquireOwnership(int clickerID)
 {
-    g_mutex_lock(&mutex);
+    g_mutex_lock(&_Mutex);
     Clicker *clicker = InnerGetClickerByID(clickerID, false);
     if (clicker != NULL)
         clicker->ownershipsCount++;
-    g_mutex_unlock(&mutex);
+    g_mutex_unlock(&_Mutex);
 
     if (clicker != NULL)
         g_mutex_lock(&clicker->ownershipLock);
@@ -175,10 +173,10 @@ Clicker *clicker_AcquireOwnership(int clickerID)
 void clicker_ReleaseOwnership(Clicker *clicker)
 {
     g_mutex_unlock(&clicker->ownershipLock);
-    g_mutex_lock(&mutex);
+    g_mutex_lock(&_Mutex);
     clicker->ownershipsCount--;
     ReleaseClickerIfNotOwned(clicker);
-    g_mutex_unlock(&mutex);
+    g_mutex_unlock(&_Mutex);
 }
 
 bool clicker_ConsumeEvent(Event* event) {

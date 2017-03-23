@@ -52,24 +52,24 @@ typedef struct {
 /**
  * \brief Create new exchanger.
  */
-DiffieHellmanKeysExchanger* dh_newKeyExchanger(char* buffer, int PModuleLength, int pCryptoGModule, Randomizer randomizer);
+DiffieHellmanKeysExchanger* dh_NewKeyExchanger(char* buffer, int PModuleLength, int pCryptoGModule, Randomizer randomizer);
 
 /**
  * \brief Release exchanger.
  */
-void dh_release(DiffieHellmanKeysExchanger**);
+void dh_Release(DiffieHellmanKeysExchanger**);
 
 /**
  * \brief Generate exchange key using exchanger passed.
  * @return exchange key or NULL if operation fails
  */
-unsigned char* dh_generateExchangeData(DiffieHellmanKeysExchanger* );
+unsigned char* dh_GenerateExchangeData(DiffieHellmanKeysExchanger* );
 
 /**
  * \brief Generate shared key for exchanger passed using 2nd party shared key (externalData).
  * @return shared key or NULL if operation fails
  */
-unsigned char* dh_completeExchangeData(DiffieHellmanKeysExchanger*, unsigned char* externalData, int dataLength);
+unsigned char* dh_CompleteExchangeData(DiffieHellmanKeysExchanger*, unsigned char* externalData, int dataLength);
 
 
 #endif /* __DIFFIEHELLMANKEYSEXCHANGER_h__ */

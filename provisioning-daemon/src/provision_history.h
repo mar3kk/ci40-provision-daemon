@@ -42,8 +42,8 @@ typedef struct {
     bool isErrored;
 } HistoryItem;
 
-void history_init(void);
-void history_destroy(void);
+void history_Init(void);
+void history_Destroy(void);
 
 /**
  * @brief Returns array of HistoryItems.

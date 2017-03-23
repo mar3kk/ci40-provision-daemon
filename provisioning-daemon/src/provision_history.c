@@ -49,15 +49,15 @@ typedef struct {
     bool isErrored;
 } HistoryEntry;
 
-static GSList* _historyElements = NULL;
-static GMutex mutex;
+static GSList* _HistoryElements = NULL;
+static GMutex _Mutex;
 
-void history_init(void) {
-    g_mutex_init(&mutex);
+void history_Init(void) {
+    g_mutex_init(&_Mutex);
 }
 
-void history_destroy(void) {
-    g_mutex_clear(&mutex);
+void history_Destroy(void) {
+    g_mutex_clear(&_Mutex);
 }
 
 void AddToHistory(int clickerId) {
@@ -75,9 +75,9 @@ void AddToHistory(int clickerId) {
 
     clicker_ReleaseOwnership(clicker);
 
-    g_mutex_lock(&mutex);
-    _historyElements = g_slist_prepend(_historyElements, entry);
-    g_mutex_unlock(&mutex);
+    g_mutex_lock(&_Mutex);
+    _HistoryElements = g_slist_prepend(_HistoryElements, entry);
+    g_mutex_unlock(&_Mutex);
 
 }
 
@@ -86,11 +86,11 @@ void PurgeOld(void) {
     unsigned long current = g_get_monotonic_time() / 1000;
 
     GSList* prev = NULL;
-    for (GSList* iter = _historyElements; iter != NULL; iter = iter->next) {
+    for (GSList* iter = _HistoryElements; iter != NULL; iter = iter->next) {
         HistoryEntry* entry = (HistoryEntry*) iter->data;
         if ((current - entry->timestamp) > MAX_LIVE_TIME) {
             if (prev == NULL)
-                _historyElements = iter->next;
+                _HistoryElements = iter->next;
             else
                 prev->next = iter->next;
 
@@ -102,11 +102,11 @@ void PurgeOld(void) {
 }
 
 GArray* history_GetProvisioned(void) {
-    g_mutex_lock(&mutex);
+    g_mutex_lock(&_Mutex);
     PurgeOld();
 
     GArray* result = g_array_new(FALSE, FALSE, sizeof(HistoryItem));
-    for (GSList* iter = _historyElements; iter != NULL; iter = iter->next) {
+    for (GSList* iter = _HistoryElements; iter != NULL; iter = iter->next) {
         HistoryEntry* entry = (HistoryEntry*) iter->data;
         HistoryItem item;
         item.id = entry->id;
@@ -115,19 +115,19 @@ GArray* history_GetProvisioned(void) {
         item.isErrored = entry->isErrored;
         g_array_append_val(result, item);
     }
-    g_mutex_unlock(&mutex);
+    g_mutex_unlock(&_Mutex);
 
     return result;
 }
 
 void history_RemoveProvisioned(int id) {
-    g_mutex_lock(&mutex);
+    g_mutex_lock(&_Mutex);
     GSList* prev = NULL;
-    for (GSList* iter = _historyElements; iter != NULL; iter = iter->next) {
+    for (GSList* iter = _HistoryElements; iter != NULL; iter = iter->next) {
         HistoryEntry* entry = (HistoryEntry*) iter->data;
         if (entry->id == id) {
             if (prev == NULL)
-                _historyElements = iter->next;
+                _HistoryElements = iter->next;
             else
                 prev->next = iter->next;
 
@@ -136,7 +136,7 @@ void history_RemoveProvisioned(int id) {
         }
         prev = iter;
     }
-    g_mutex_unlock(&mutex);
+    g_mutex_unlock(&_Mutex);
 }
 
 bool history_ConsumeEvent(Event* event) {

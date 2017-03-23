@@ -77,6 +77,6 @@ Event* event_PopEvent(void);
  * Releases event struct from memory, if data associated with this event is an pointer, and event has flag
  * freeDataPtrOnRelease set to true, then this pointer is also released by call to g_free().
  */
-void event_releaseEvent(Event** event);
+void event_ReleaseEvent(Event** event);
 
 #endif /* _EVENT_H_ */
