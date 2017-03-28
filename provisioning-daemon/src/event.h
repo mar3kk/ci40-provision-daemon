@@ -28,68 +28,55 @@
  * WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
- /**
-  * Provides mechanism to put time consuming tasks of clicker provisioning onto worker thread.
-  */
+#ifndef _EVENT_H_
+#define _EVENT_H_
 
-#ifndef __PROCESSING_QUEUE_H__
-#define __PROCESSING_QUEUE_H__
-#include <stdint.h>
-#include <semaphore.h>
-#include <stddef.h>
+#include <glib.h>
+#include <stdbool.h>
 
-/**
- * Represents available task types that can be added to queue
- */
-typedef enum
-{
-    queue_TaskType_GENERATE_ALICE_KEY,
-    queue_TaskType_GENERATE_SHARED_KEY,
-    queue_TaskType_GENERATE_PSK
-} queue_TaskType;
+typedef enum {
+    EventType_CLICKER_CREATE,   //int - id of clicker
+    EventType_CLICKER_DESTROY,  //int - id of clicker
+    EventType_CLICKER_SELECT, //int - id of clicker which should become selected one
+    EventType_CLICKER_START_PROVISION, //int - id of clicker to do provision
+    EventType_CONNECTION_SEND_COMMAND, //ptr - points to NetworkDataPack, ownership is passed to receiver
+    EventType_CONNECTION_RECEIVED_COMMAND, //ptr - points to NetworkDataPack (will be released on event destruction)
+    EventType_PSK_OBTAINED, //ptr - points to PreSharedKey struct
+    EventType_TRY_TO_SEND_PSK_TO_CLICKER,  //int - id of clicker to which PSK should be send
+    EventType_HISTORY_REMOVE, //int - id of clicker to remove from history
+    EventType_HISTORY_ADD, //int - id of clicker to add to history
+} EventType;
 
-
-
-/**
- * @brief Represents a single task than can be added to queue for processing
- */
-typedef struct queue_Task
-{
-    queue_TaskType type;
-    uint8_t clickerID;
-    void * inData;
-    uint8_t inDataLength;
-    void *outData;
-    uint8_t outDataLength;
-    sem_t * semaphore;
-    int statusCode;
-    struct queue_Task *next;
-} queue_Task;
-
-/**
- * @brief this struct is returned in queue_TaskType_GENERATE_PSK outData.
- */
 typedef struct {
-  char psk[255];
-  uint8_t pskLen;
-  char identity[64];
-  size_t identityLen;
-} queue_pskIdentityPair;
+    int id;
+    EventType type;
+    union {
+        int     intData;
+        void*   ptrData;
+    };
+    bool freeDataPtrOnRelease;
+} Event;
+
+void event_Init(void);
+void event_Shutdown(void);
+
+/** ----- All methods below are thread safe ---- **/
+/**
+ * Adds new event to queue.
+ */
+void event_PushEventWithInt(EventType type, int data);
+void event_PushEventWithPtr(EventType type, void* dataPtr, bool freeDataOnRelease);
 
 /**
- * @brief Add new task to queue.
- * @param[in] task that will be added to queue
+ * Pops event from queue, if no events avail then NULL is returned. After handling returned event you should call
+ * event_releaseEvent(&event).
  */
-void queue_AddTask( queue_Task *task);
+Event* event_PopEvent(void);
 
 /**
- * @brief Pops result of last computed task.
- * @return task with field outData filled with computation result or NULL if no result is availbale yet
+ * Releases event struct from memory, if data associated with this event is an pointer, and event has flag
+ * freeDataPtrOnRelease set to true, then this pointer is also released by call to g_free().
  */
-queue_Task * queue_PopResult(void);
+void event_ReleaseEvent(Event** event);
 
-queue_Task * queue_NewQueueTask(queue_TaskType type, uint8_t clickerID, void * inData, uint8_t inDataLength, sem_t * sem);
-void queue_ReleaseTask(queue_Task * task);
-void queue_Start(void);
-void queue_Stop(void);
-#endif
+#endif /* _EVENT_H_ */

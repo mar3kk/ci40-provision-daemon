@@ -24,19 +24,23 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-typedef void (*pdubus_GeneratePskCallback)(char *psk, char *identity, void *userData);
+#define PSK_ARRAYS_SIZE 255
 
-typedef struct
-{
-    pdubus_GeneratePskCallback callback;
-    void *priv;
-} pdubus_GeneratePskRequest;
+typedef struct  {
+    int clickerId;
+
+    char psk[PSK_ARRAYS_SIZE];
+    uint8_t pskLen;
+
+    char identity[PSK_ARRAYS_SIZE];
+    uint8_t identityLen;
+} PreSharedKey;
 
 /**
  * @brief Init ubus mechanism, register objects
  */
 bool ubusagent_Init(void);
-void ubusagent_Close(void);
+void ubusagent_Destroy(void);
 
 bool ubusagent_EnableRemoteControl(void);
 
@@ -44,10 +48,10 @@ bool ubusagent_EnableRemoteControl(void);
  * @brief Send "generatePsk" call to "imgtec" object through ubus.
  * This call is blocking, and may take up to 10 seconds to return.
  *
- * @param[in] callback that will be called upon completion of request
- * return true if request has been successfully performed, false otherwise. this
- * only means that request went away succesfully there still may error return in callback response.
+ * @param[in] clickerId which asks for psk, it will be used with event: EventType_PSK_OBTAINED
+ * @return true if request has been successfully performed, false otherwise. This
+ * only means that request went away successfully there still may error return in EventType_PSK_OBTAINED event.
  */
-bool ubusagent_SendGeneratePskMessage(pdubus_GeneratePskRequest *request);
+bool ubusagent_SendGeneratePskMessage(int clickerId);
 
 #endif /* UBUS_AGENT_H_ */

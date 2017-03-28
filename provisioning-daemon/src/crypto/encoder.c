@@ -33,55 +33,54 @@
 #include <string.h>
 #include <stdlib.h>
 
-uint8_t* softap_encodeBytes(uint8_t* src, uint8_t len, uint8_t* key, uint8_t* outputSize) {
-  uint8_t IV[16];
-  int t;
-  for(t = 0; t < 15; t++) { //spare the last byte
-    IV[t] = key[15 - t];
-  }
-
-  int paddedSize = (len / 16) * 16;
-  if (paddedSize < len) {
-    paddedSize += 16;
-  }
-  *outputSize = paddedSize;
-
-  uint8_t* result = malloc(paddedSize);
-
-  rijndael_ctx ctx;
-  rijndael_set_key(&ctx, key, 128);
-
-  int y;
-  for(t = 0; t < paddedSize; t += 16) {
-    IV[15] = t / 16;
-    for(y = 0; y < 16; y++) {
-      src[t+y] ^= IV[y];
+uint8_t* softap_EncodeBytes(uint8_t* src, uint8_t len, uint8_t* key, uint8_t* outputSize) {
+    uint8_t IV[16];
+    int t;
+    for (t = 0; t < 15; t++) { //spare the last byte
+        IV[t] = key[15 - t];
     }
-    rijndael_encrypt(&ctx, src + t, result + t);
-  }
 
-  return result;
+    int paddedSize = (len / 16) * 16;
+    if (paddedSize < len) {
+        paddedSize += 16;
+    }
+    *outputSize = paddedSize;
+
+    uint8_t* result = malloc(paddedSize);
+
+    rijndael_ctx ctx;
+    rijndael_set_key(&ctx, key, 128);
+
+    int y;
+    for (t = 0; t < paddedSize; t += 16) {
+        IV[15] = t / 16;
+        for (y = 0; y < 16; y++) {
+            src[t + y] ^= IV[y];
+        }
+        rijndael_encrypt(&ctx, src + t, result + t);
+    }
+
+    return result;
 }
 
-
-void softap_decodeBytes(uint8_t* data, uint8_t len, uint8_t* key_n_iv) {
-  uint8_t IV[16];
-  int t;
-  for(t = 0; t < 15; t++) { //spare the last byte
-    IV[t] = key_n_iv[16+t];
-  }
-
-  rijndael_ctx ctx;
-  rijndael_set_key(&ctx, key_n_iv, 128);
-
-  uint8_t tmp[16];
-  int y;
-  for(t = 0; t < len; t += 16) {
-    rijndael_decrypt(&ctx, data + t, tmp);
-    IV[15] = t / 16;
-    for(y = 0; y < 16; y++) {
-      tmp[y] ^= IV[y];
+void softap_DecodeBytes(uint8_t* data, uint8_t len, uint8_t* key_n_iv) {
+    uint8_t IV[16];
+    int t;
+    for (t = 0; t < 15; t++) { //spare the last byte
+        IV[t] = key_n_iv[16 + t];
     }
-    memcpy(data + t, tmp, 16);
-  }
+
+    rijndael_ctx ctx;
+    rijndael_set_key(&ctx, key_n_iv, 128);
+
+    uint8_t tmp[16];
+    int y;
+    for (t = 0; t < len; t += 16) {
+        rijndael_decrypt(&ctx, data + t, tmp);
+        IV[15] = t / 16;
+        for (y = 0; y < 16; y++) {
+            tmp[y] ^= IV[y];
+        }
+        memcpy(data + t, tmp, 16);
+    }
 }

@@ -29,11 +29,9 @@
  */
 
 #include "connection_manager.h"
-#include "log.h"
 #include "utils.h"
 #include "clicker.h"
 #include "provision_history.h"
-
 #include <unistd.h>
 #include <errno.h>
 #include <sys/ioctl.h>
@@ -44,125 +42,135 @@
 #include <arpa/inet.h>
 #include <net/if.h>
 #include <stdlib.h>
+#include <glib.h>
+#include <string.h>
 
+typedef struct {
+    int clickerID; /**< id of clicker bound to this connection. */
+    gint64 lastKeepAliveTime; /**< unix timestamp of last KEEP_ALIVE command sent to this clicker */
+    int socket; /**< socket descriptor on which this clicker operates */
+    char ip[INET6_ADDRSTRLEN]; /**< textual representation of IP, null terminated */
+    uint16_t port; /** Port on which socket is bound */
+} ConnectionData;
 
+static GList* _ConnectionsList = NULL;
 
-static struct timeval _SelectTimeout;
 static int _MasterSocket;
-static struct sockaddr_in6 _Address;
-static int _MaxSD;
-static char _Buffer[1024];
-static pd_CommandCallback _CommandCallback;
-static pd_ClickerDisconnectedCallback _ClickerDisconnectedCallback;
-static pd_ClickerConnectedCallback _ClickerConnectedCallback;
 static unsigned long _LastKeepAliveSendTime = 0;
 static unsigned long _LastCheckConnectionsTime = 0;
-static int _SelectedSocket;
-static int _Addrlen;
-static char _Inet6AddrBuffer[INET6_ADDRSTRLEN];
-static fd_set _Readfs;
+static int _IDCounter = 0; /**< Used to give UIDs for newly created clickers */
 
-
-int g_pd_ConnectedClickers = 0;
-
-
-static void HandleDisconnect(Clicker *clicker)
-{
-    int socket = clicker->socket;
-    getpeername(socket , (struct sockaddr*)&_Address , (socklen_t*)&_Addrlen);
-    inet_ntop(AF_INET6, &(_Address).sin6_addr, _Inet6AddrBuffer, INET6_ADDRSTRLEN);
-    LOG(LOG_INFO, "Clicker disconnected, id : %d , ip %s , port %d \n" , clicker->clickerID, _Inet6AddrBuffer , ntohs(_Address.sin6_port));
-    close( socket );
-    _ClickerDisconnectedCallback(clicker);
-    clicker_Release(clicker);
-    g_pd_ConnectedClickers--;
+void ConnectionDataToString(ConnectionData* connection, char* buf, size_t bufLen) {
+    snprintf(buf, bufLen, "ClickerID:%d, ip:[%s], socket:%d, port:%d, keepAliveTime:%llu", connection->clickerID,
+            connection->ip, connection->socket, connection->port, connection->lastKeepAliveTime);
 }
 
-static void AcceptConnection(struct sockaddr_in6 *address)
-{
-    int newSocket = 0;
+static void HandleDisconnect(ConnectionData* connection) {
+    char buf[1024];
+    ConnectionDataToString(connection, buf, sizeof(buf));
+    g_message("Clicker disconnected, %s\n", buf);
+    close(connection->socket);
 
-    if ((newSocket = accept(_MasterSocket, (struct sockaddr *)address, (socklen_t*)&_Addrlen))<0)
-    {
-        LOG(LOG_ERR, "Error accpeting connection. Errno: %d \n", errno);
+    event_PushEventWithInt(EventType_CLICKER_DESTROY, connection->clickerID);
+
+    _ConnectionsList = g_list_remove(_ConnectionsList, connection);
+    g_free(connection);
+}
+
+static void AcceptConnection() {
+    int newSocket = 0;
+    struct sockaddr_in6 address;
+    socklen_t addrLen = sizeof(address);
+
+    if ((newSocket = accept(_MasterSocket, (struct sockaddr *) &address, &addrLen)) < 0) {
+        g_critical("Error accepting connection. Errno: %d \n", errno);
         return;
     }
-    getpeername(newSocket , (struct sockaddr*)&_Address , (socklen_t*)&_Addrlen);
-    inet_ntop(AF_INET6, &(*address).sin6_addr, _Inet6AddrBuffer, INET6_ADDRSTRLEN);
 
-    Clicker *newClicker = clicker_New(newSocket);
+    _IDCounter++;
 
-    LOG(LOG_INFO, "New clicker connected, id : %d, socket fd : %d, ip : %s, port : %d \n",
-        newClicker->clickerID, newSocket, _Inet6AddrBuffer, ntohs((*address).sin6_port));
-    _ClickerConnectedCallback(newClicker, _Inet6AddrBuffer);
+    ConnectionData* connection = g_new0(ConnectionData, 1);
+    connection->clickerID = _IDCounter;
+    connection->lastKeepAliveTime = g_get_monotonic_time() / 1000;
+    connection->socket = newSocket;
+    connection->port = ntohs(address.sin6_port);
 
-    g_pd_ConnectedClickers++;
+    memset(connection->ip, 0, sizeof(connection->ip));
+    if (inet_ntop(AF_INET6, &address.sin6_addr, connection->ip, INET6_ADDRSTRLEN) < 0) {
+        g_critical("Failed to convert ipv6 address to string of clicker id: %d", connection->clickerID);
+        strlcpy(connection->ip, "::1", INET6_ADDRSTRLEN);
+    }
+
+    _ConnectionsList = g_list_prepend(_ConnectionsList, connection);
+
+    event_PushEventWithInt(EventType_CLICKER_CREATE, connection->clickerID);
+
+    char buf[1024];
+    ConnectionDataToString(connection, buf, sizeof(buf));
+    g_message("New clicker connected: %s\n", buf);
 }
 
-static int HandleRead(struct sockaddr_in6 *address)
-{
-    int sd = 0;
+static void HandleReceivedData(ConnectionData* connection, uint8_t* buffer, size_t dataLen) {
+    NetworkCommand cmd = buffer[0];
+    if (cmd == NetworkCommand_KEEP_ALIVE) {
+        connection->lastKeepAliveTime = g_get_monotonic_time() / 1000;
+        //g_debug("Got keepalive response for clicker:%d", connection->clickerID);
+
+    } else {
+        dataLen--; //skip info about command (1 byte)
+        NetworkDataPack* data = con_BuildNetworkDataPack(connection->clickerID, cmd, buffer + 1, dataLen, true);
+        event_PushEventWithPtr(EventType_CONNECTION_RECEIVED_COMMAND, data, true);
+    }
+}
+
+static int HandleRead(fd_set* readFS) {
+    int socket = 0;
     size_t valread = 0;
-    Clicker *clicker = clicker_GetClickers();
-    while (clicker != NULL)
-    {
-        sd = clicker->socket;;
-        if (FD_ISSET(sd, &_Readfs))
-        {
-            if ((valread = read(sd, _Buffer, 1024)) == 0)
-            {
-                LOG(LOG_DBG, "Read error. Disconnecting");
-                HandleDisconnect(clicker);
-                return 0;
-            }
-            else
-            {
-                _CommandCallback(clicker, _Buffer);
-                return 1;
+
+    GList* tmpList = g_list_copy(_ConnectionsList);
+    uint8_t buffer[1024];
+    for (GList* iter = tmpList; iter != NULL; iter = iter->next) {
+        ConnectionData* connection = (ConnectionData*) iter->data;
+        socket = connection->socket;
+
+        memset(buffer, 0, sizeof(buffer));
+        if (FD_ISSET(socket, readFS)) {
+            if ((valread = read(socket, buffer, 1024)) == 0) {
+                g_debug("Read error. Disconnecting");
+                HandleDisconnect(connection);
+            } else {
+                HandleReceivedData(connection, buffer, valread);
             }
         }
-        clicker = clicker->next;
     }
+
+    g_list_free(tmpList);
     return 0;
 }
 
-int con_BindAndListen(
-    int tcpPort,
-    pd_CommandCallback commandCallback,
-    pd_ClickerConnectedCallback clickerConnectedCallback,
-    pd_ClickerDisconnectedCallback clickerDisconnectedCallback)
-{
-    _CommandCallback = commandCallback;
-    _ClickerConnectedCallback = clickerConnectedCallback;
-    _ClickerDisconnectedCallback = clickerDisconnectedCallback;
+int con_BindAndListen(int tcpPort) {
 
     int reuse_addr = 1;
 
-    _SelectTimeout.tv_sec = 0;
-    _SelectTimeout.tv_usec = 2000;
-
     _MasterSocket = socket(AF_INET6, SOCK_STREAM, 0);
-    if ( _MasterSocket == -1 )
-    {
+    if (_MasterSocket == -1) {
         int err = errno;
-        LOG(LOG_ERR, "Error opening socket. ERRNO: %d \n", err);
+        g_critical("Error opening socket. ERRNO: %d \n", err);
         return -1;
     }
 
-    if ( setsockopt(_MasterSocket, SOL_SOCKET, SO_REUSEADDR, &reuse_addr, sizeof(reuse_addr)) < 0 )
-    {
-        LOG(LOG_ERR, "Failed to set socket option");
+    if (setsockopt(_MasterSocket, SOL_SOCKET, SO_REUSEADDR, &reuse_addr, sizeof(reuse_addr)) < 0) {
+        g_critical("Failed to set socket option");
         return -1;
     }
 
-    _Address.sin6_family = AF_INET6;
-    _Address.sin6_port = htons(tcpPort);
-    _Address.sin6_addr = in6addr_any;
+    struct sockaddr_in6 address;
+    address.sin6_family = AF_INET6;
+    address.sin6_port = htons(tcpPort);
+    address.sin6_addr = in6addr_any;
 
-
-    if (bind(_MasterSocket, (struct sockaddr *)&_Address, sizeof(_Address) ) == -1)
-    {
-        LOG(LOG_ERR, "Error binding socket. ERRNO: %d \n", errno);
+    if (bind(_MasterSocket, (struct sockaddr *) &address, sizeof(address)) == -1) {
+        g_critical("Error binding socket. ERRNO: %d \n", errno);
         return -1;
     }
 
@@ -170,98 +178,164 @@ int con_BindAndListen(
     return 0;
 }
 
-static void CheckConnections(void)
-{
-    long currentTimeMillis = GetCurrentTimeMillis();
-    Clicker *clicker = clicker_GetClickers();
-
-    while(clicker != NULL)
-    {
-        if (currentTimeMillis - clicker->lastKeepAliveTime > KEEP_ALIVE_TIMEOUT_MS)
-            HandleDisconnect(clicker);
-
-        clicker = clicker->next;
-    }
-}
-
-void con_ProcessConnections(void)
-{
-    int i = 0;
-    int activity, sd;
-    FD_ZERO(&_Readfs);
-    FD_SET(_MasterSocket, &_Readfs);
-    _MaxSD = _MasterSocket;
-
-    Clicker *ptr = clicker_GetClickers();
-
-    while(ptr != NULL)
-    {
-        sd = ptr->socket;
-        if (sd > 0)
-           FD_SET(sd, &_Readfs);
-        if (sd > _MaxSD)
-            _MaxSD = sd;
-        ptr = ptr->next;
-   }
-
-    activity = select(_MaxSD + 1, &_Readfs, NULL, NULL, &_SelectTimeout);
-
-    if (activity < 0)
-    {
-        LOG(LOG_ERR, "select error. Errno: %d", errno);
+static void SendCommand(ConnectionData* connection, NetworkCommand command) {
+    if (connection == NULL) {
+        g_warning("SendCommandWithData: No connection.");
         return;
     }
-
-    if (FD_ISSET(_MasterSocket, &_Readfs))  //handle incoming connection
-        AcceptConnection(&_Address);
-    else                                    //handle read
-        HandleRead(&_Address);
-
-    unsigned long currentTimeMillis = GetCurrentTimeMillis();
-    if (currentTimeMillis - _LastKeepAliveSendTime > KEEP_ALIVE_INTERVAL_MS)
-    {
-        _LastKeepAliveSendTime = currentTimeMillis;
-        Clicker *ptr = clicker_GetClickers();
-
-        while(ptr != NULL)
-        {
-            con_SendCommand(ptr, NetworkCommand_KEEP_ALIVE);
-            ptr = ptr->next;
-        }
-    }
-
-    if (currentTimeMillis - _LastCheckConnectionsTime > CHECK_CONNECTIONS_INTERVAL_MS)
-    {
-        _LastCheckConnectionsTime = currentTimeMillis;
-        CheckConnections();
-    }
+    char buffer[2];
+    buffer[0] = (char) command;
+    send(connection->socket, buffer, 1, 0);
 }
 
-
-void con_SendCommand(Clicker* clicker, NetworkCommand command)
-{
-    _Buffer[0] = command;
-    send(clicker->socket, _Buffer, 1, 0);
-}
-
-void con_SendCommandWithData(Clicker *clicker, NetworkCommand command, uint8_t *data, uint8_t dataLength)
-{
-    uint8_t buffer[dataLength+2];
+static void SendCommandWithData(ConnectionData* connection, NetworkCommand command, uint8_t *data, uint8_t dataLength) {
+    if (data == NULL || dataLength == 0) {
+        g_warning("SendCommandWithData: Tried to send command with no needed data.");
+        return;
+    }
+    if (connection == NULL) {
+        g_warning("SendCommandWithData: No connection.");
+        return;
+    }
+    uint8_t buffer[dataLength + 2];
 
     buffer[0] = command;
     buffer[1] = dataLength;
     memcpy(&buffer[2], data, dataLength);
-    send(clicker->socket, buffer, dataLength+2, 0);
+    send(connection->socket, buffer, dataLength + 2, 0);
 }
 
-void con_Disconnect(Clicker *clicker)
-{
-    int socket = clicker->socket;
-    getpeername(socket , (struct sockaddr*)&_Address , (socklen_t*)&_Addrlen);
-    inet_ntop(AF_INET6, &(_Address).sin6_addr, _Inet6AddrBuffer, INET6_ADDRSTRLEN);
-    LOG(LOG_INFO, "Clicker disconnected, id : %d , ip %s , port %d \n" , clicker->clickerID, _Inet6AddrBuffer , ntohs(_Address.sin6_port));
-    close( socket );
-    _ClickerDisconnectedCallback(clicker);
-    clicker_Release(clicker);
-    g_pd_ConnectedClickers--;
+static void CheckConnections(void) {
+    gint64 currentTimeMillis = g_get_monotonic_time() / 1000;
+    if (currentTimeMillis - _LastCheckConnectionsTime > CHECK_CONNECTIONS_INTERVAL_MS) {
+        _LastCheckConnectionsTime = currentTimeMillis;
+
+        for (GList* iter = _ConnectionsList; iter != NULL; iter = iter->next) {
+            ConnectionData* connection = (ConnectionData*) iter->data;
+            if (currentTimeMillis - connection->lastKeepAliveTime > KEEP_ALIVE_TIMEOUT_MS) HandleDisconnect(connection);
+        }
+    }
+}
+
+static void SendKeepAlive(void) {
+    unsigned long currentTimeMillis = g_get_monotonic_time() / 1000;
+    if (currentTimeMillis - _LastKeepAliveSendTime > KEEP_ALIVE_INTERVAL_MS) {
+        _LastKeepAliveSendTime = currentTimeMillis;
+        for (GList* iter = _ConnectionsList; iter != NULL; iter = iter->next) {
+            SendCommand(iter->data, NetworkCommand_KEEP_ALIVE);
+        }
+    }
+}
+
+void con_ProcessConnections(void) {
+    int activity;
+    fd_set readFS;
+    FD_ZERO(&readFS);
+    FD_SET(_MasterSocket, &readFS);
+    int maxSD = _MasterSocket;
+
+    GList* iter = _ConnectionsList;
+    while (iter != NULL) {
+        ConnectionData* data = (ConnectionData*) iter->data;
+        int socket = data->socket;
+        if (socket > 0)
+        FD_SET(socket, &readFS);
+
+        if (socket > maxSD) maxSD = socket;
+
+        iter = iter->next;
+    }
+    struct timeval selectTimeout;
+    selectTimeout.tv_sec = 0;
+    selectTimeout.tv_usec = 2000;
+
+    activity = select(maxSD + 1, &readFS, NULL, NULL, &selectTimeout);
+
+    if (activity < 0) {
+        g_critical("select error. Errno: %d", errno);
+        return;
+    }
+
+    if (FD_ISSET(_MasterSocket, &readFS))  //handle incoming connection
+        AcceptConnection();
+    else
+        //handle read
+        HandleRead(&readFS);
+
+    SendKeepAlive();
+    CheckConnections();
+}
+
+gint CompareConnectionByClickerId(gpointer a, gpointer b) {
+    ConnectionData* conn1 = (ConnectionData*) a;
+    ConnectionData* conn2 = (ConnectionData*) b;
+    return conn1->clickerID - conn2->clickerID;
+}
+
+ConnectionData* ConnectionForClickerId(int clickerID) {
+    ConnectionData tmp = { .clickerID = clickerID };
+    GList* found = g_list_find_custom(_ConnectionsList, &tmp, (GCompareFunc) CompareConnectionByClickerId);
+    return found != NULL ? found->data : NULL;
+}
+
+void con_Disconnect(int clickerID) {
+    ConnectionData* found = ConnectionForClickerId(clickerID);
+    if (found != NULL) {
+        HandleDisconnect(found);
+    }
+}
+
+void HandleSendCommandEvent(NetworkDataPack* data) {
+    ConnectionData* connection = ConnectionForClickerId(data->clickerID);
+    if (connection == NULL) {
+        g_critical("Can't send data to clicker %d, connection not found! Command to send: %d", data->clickerID,
+                data->command);
+        return;
+    }
+    if (data->data != NULL && data->dataSize != 0) {
+        if (data->dataSize > 255) {
+            g_critical("Data size to send is to big, clickerId:%d, command:%d, size:%d", data->clickerID,
+                    data->command, data->dataSize);
+        }
+        SendCommandWithData(connection, data->command, data->data, (uint8_t) data->dataSize);
+        g_free(data->data);
+
+    } else {
+        SendCommand(connection, data->command);
+    }
+}
+
+bool con_ConsumeEvent(Event* event) {
+    switch (event->type) {
+        case EventType_CONNECTION_SEND_COMMAND:
+            HandleSendCommandEvent(event->ptrData);
+            return true;
+
+        default:
+            break;
+    }
+    return false;
+}
+
+NetworkDataPack* con_BuildNetworkDataPack(int clickerID, NetworkCommand cmd, uint8_t* data, uint16_t dataLen,
+bool copyData) {
+
+    NetworkDataPack* pack = g_new(NetworkDataPack, 1);
+    pack->clickerID = clickerID;
+    pack->command = cmd;
+    if (copyData && dataLen > 0) {
+        pack->data = g_malloc(dataLen);
+        memcpy(pack->data, data, dataLen);
+
+    } else {
+        pack->data = data;
+    }
+    pack->dataSize = dataLen;
+
+    return pack;
+}
+
+char* con_GetIPForClicker(int clickerId) {
+    ConnectionData* data = ConnectionForClickerId(clickerId);
+    return data != NULL ? (char*) data->ip : NULL;
 }

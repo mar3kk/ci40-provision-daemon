@@ -60,8 +60,35 @@
     </div><!-- /.modal-content -->
   </div><!-- /.modal-dialog -->
 </div><!-- /.modal -->
-</div>
 
+
+
+<div class="modal" tabindex="-1" role="dialog" id="clicker-name-modal">
+  <div class="modal-dialog modal-sm" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h4 class="modal-title">Enter new clicker name</h4>
+    </div>
+      <div class="modal-body">
+        <div class="row">
+            <div class="col-lg-12" id="clicker-name-modal-body">
+                <input type="text" class="form-control" id="clicker-name-modal-input"/>
+            </div>
+        </div>
+        <br />
+        <div class="row">
+            <div class="col-lg-12 text-right">
+                <button id="clicker-name-modal-save" type="button" class="btn btn-primary" data-dismiss="modal">Save</button>
+                <button type="button" class="btn btn-primary" data-dismiss="modal">Cancel</button>
+            </div>
+        </div>
+
+      </div>
+
+    </div><!-- /.modal-content -->
+  </div><!-- /.modal-dialog -->
+</div><!-- /.modal -->
+</div>
 <%+footer%>
 
 <script>
@@ -150,6 +177,33 @@ function startStopDaemon() {
             location.reload();
         },1000);
 
+    });
+}
+
+function changeClickerName(id, name) {
+    showClickerNameModal(id, name);
+}
+
+function showClickerNameModal(id, name) {
+    $("#clicker-name-modal-input").val(name);
+    $("#clicker-name-modal-save").attr("onclick","saveClickerName(" + id + ", $('#clicker-name-modal-input').val());");
+    $("#clicker-name-modal").modal('show');
+}
+
+function hideClickerNameModal() {
+
+}
+
+function saveClickerName(id, name) {
+    $.post('provisioning/change_clicker_name', {clickerID : id, clickerName : name}, function(data) {
+
+    })
+    .fail(function(jqXHR, textStatus, errorThrown) {
+        hideClickerNameModal();
+        showModalError(errorThrown);
+    })
+    .done(function() {
+        hideClickerNameModal();
     });
 }
 
