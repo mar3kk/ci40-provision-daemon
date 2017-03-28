@@ -32,13 +32,9 @@
 #define __CLICKER_SM_H__
 
 #include "clicker.h"
-#include "processing_queue.h"
+#include "event.h"
 #include <stdint.h>
 
-/**
- * @brief Get next task that can be executed for specified clicker.
- * @return task or NULL if nothing can be done
- */
-queue_Task *clicker_sm_GetNextTask(Clicker *);
+bool clicker_sm_ConsumeEvent(Event* event);
 
 #endif

@@ -33,114 +33,109 @@
 #include <time.h>
 #include <string.h>
 
-DiffieHellmanKeysExchanger* dh_newKeyExchanger(char* buffer, int PModuleLength, int pCryptoGModule, Randomizer rand) {
+DiffieHellmanKeysExchanger* dh_NewKeyExchanger(char* buffer, int PModuleLength, int pCryptoGModule, Randomizer rand) {
 
-  DiffieHellmanKeysExchanger* result = malloc(sizeof(DiffieHellmanKeysExchanger));
-  result->pModuleLength = PModuleLength;
-  result->pCryptoPModule = malloc(PModuleLength);
-  if (buffer) {
-    memcpy(result->pCryptoPModule, buffer, PModuleLength);
-  }
-  result->pCryptoGModule = pCryptoGModule;
-  result->x = NULL;
-  result->randomizer = rand;
-  return result;
-}
-
-void dh_release(DiffieHellmanKeysExchanger** exchanger) {
-  if (exchanger) {
-    free((*exchanger)->pCryptoPModule);
-    (*exchanger)->pCryptoPModule = NULL;
-    if ((*exchanger)->x) {
-      bi_release(&(*exchanger)->x);
+    DiffieHellmanKeysExchanger* result = malloc(sizeof(DiffieHellmanKeysExchanger));
+    result->pModuleLength = PModuleLength;
+    result->pCryptoPModule = malloc(PModuleLength);
+    if (buffer) {
+        memcpy(result->pCryptoPModule, buffer, PModuleLength);
     }
-    (*exchanger)->randomizer = NULL;
-    free(*exchanger);
-    *exchanger = NULL;
-  }
+    result->pCryptoGModule = pCryptoGModule;
+    result->x = NULL;
+    result->randomizer = rand;
+    return result;
 }
 
-void dh_invertBinary(unsigned char* binary, int length)
-{
-  size_t i;
-  for (i = 0; i < length / 2; ++i)
-  {
-    char tmp = binary[i];
-    binary[i] = binary[length - i - 1];
-    binary[length - i - 1] = tmp;
-  }
-}
-
-BigInt* dh_ApowBmodN(BigInt* a, BigInt* b, BigInt* n, int len)
-{
-  BigInt* result = bi_createFromLong(1, len);
-  BigInt* counter = bi_clone(b);
-  BigInt* base = bi_clone(a);
-  BigInt* ZERO = bi_create(NULL, len);
-  BigInt* ONE = bi_createFromLong(1, len);
-  BigInt* TWO = bi_createFromLong(2, len);
-  while (!bi_equal(counter, ZERO))
-  {
-    if (bi_isEvenNumber(counter)) {
-      bi_divide(counter,TWO);
-      bi_multiplyAmodB(base, base, n);
+void dh_Release(DiffieHellmanKeysExchanger** exchanger) {
+    if (exchanger) {
+        free((*exchanger)->pCryptoPModule);
+        (*exchanger)->pCryptoPModule = NULL;
+        if ((*exchanger)->x) {
+            bi_Release(&(*exchanger)->x);
+        }
+        (*exchanger)->randomizer = NULL;
+        free(*exchanger);
+        *exchanger = NULL;
     }
-    else
-    {
-      bi_sub(counter, ONE);
-      bi_multiplyAmodB(result,base, n);
+}
+
+void dh_InvertBinary(unsigned char* binary, int length) {
+    size_t i;
+    for (i = 0; i < length / 2; ++i) {
+        char tmp = binary[i];
+        binary[i] = binary[length - i - 1];
+        binary[length - i - 1] = tmp;
     }
-  }
-  bi_release(&counter);
-  bi_release(&base);
-  bi_release(&TWO);
-  bi_release(&ONE);
-  bi_release(&ZERO);
-  return result;
 }
 
-unsigned char* dh_generateExchangeData(DiffieHellmanKeysExchanger* exchanger) {
-  BigInt* g = bi_createFromLong(exchanger->pCryptoGModule, exchanger->pModuleLength);
-  BigInt* p = bi_create(exchanger->pCryptoPModule, exchanger->pModuleLength);
-  int length = exchanger->pModuleLength;
-  unsigned char xBuff[length];
-  if (!exchanger->randomizer(xBuff, length)) {
-    return NULL;
-  }
-  dh_invertBinary(xBuff, length);
-  exchanger->x = bi_create(xBuff, length);
-  BigInt* y = bi_createFromLong(0, length);
-  BigInt* i69h = dh_ApowBmodN(g, exchanger->x, p, length);
-  bi_assign(y, i69h);
-  bi_release(&i69h);
-  unsigned char* result = malloc(length);
-  memcpy(result, y->buffer, length);
-  bi_release(&y);
-  bi_release(&p);
-  bi_release(&g);
-
-  return result;
+BigInt* dh_ApowBmodN(BigInt* a, BigInt* b, BigInt* n, int len) {
+    BigInt* result = bi_CreateFromLong(1, len);
+    BigInt* counter = bi_Clone(b);
+    BigInt* base = bi_Clone(a);
+    BigInt* ZERO = bi_Create(NULL, len);
+    BigInt* ONE = bi_CreateFromLong(1, len);
+    BigInt* TWO = bi_CreateFromLong(2, len);
+    while (!bi_Equal(counter, ZERO)) {
+        if (bi_IsEvenNumber(counter)) {
+            bi_Divide(counter, TWO);
+            bi_MultiplyAmodB(base, base, n);
+        } else {
+            bi_Sub(counter, ONE);
+            bi_MultiplyAmodB(result, base, n);
+        }
+    }
+    bi_Release(&counter);
+    bi_Release(&base);
+    bi_Release(&TWO);
+    bi_Release(&ONE);
+    bi_Release(&ZERO);
+    return result;
 }
 
-unsigned char* dh_completeExchangeData(DiffieHellmanKeysExchanger* exchanger, unsigned char* externalData, int dataLength) {
-  if (exchanger->pModuleLength <= dataLength) {
-
+unsigned char* dh_GenerateExchangeData(DiffieHellmanKeysExchanger* exchanger) {
+    BigInt* g = bi_CreateFromLong(exchanger->pCryptoGModule, exchanger->pModuleLength);
+    BigInt* p = bi_Create(exchanger->pCryptoPModule, exchanger->pModuleLength);
     int length = exchanger->pModuleLength;
-    BigInt* p = bi_create(exchanger->pCryptoPModule, exchanger->pModuleLength);
-    BigInt* extData = bi_create(externalData, dataLength);
-    BigInt* y = bi_createFromLong(0, length);
-    BigInt* i69h = dh_ApowBmodN(extData, exchanger->x, p, length);
-    bi_assign(y, i69h);
-    bi_release(&i69h);
-
+    unsigned char xBuff[length];
+    if (!exchanger->randomizer(xBuff, length)) {
+        return NULL;
+    }
+    dh_InvertBinary(xBuff, length);
+    exchanger->x = bi_Create(xBuff, length);
+    BigInt* y = bi_CreateFromLong(0, length);
+    BigInt* i69h = dh_ApowBmodN(g, exchanger->x, p, length);
+    bi_Assign(y, i69h);
+    bi_Release(&i69h);
     unsigned char* result = malloc(length);
     memcpy(result, y->buffer, length);
+    bi_Release(&y);
+    bi_Release(&p);
+    bi_Release(&g);
 
-    bi_release(&y);
-    bi_release(&extData);
-    bi_release(&p);
     return result;
-  }
+}
 
-  return NULL;
+unsigned char* dh_CompleteExchangeData(DiffieHellmanKeysExchanger* exchanger, unsigned char* externalData,
+        int dataLength) {
+    if (exchanger->pModuleLength <= dataLength) {
+
+        int length = exchanger->pModuleLength;
+        BigInt* p = bi_Create(exchanger->pCryptoPModule, exchanger->pModuleLength);
+        BigInt* extData = bi_Create(externalData, dataLength);
+        BigInt* y = bi_CreateFromLong(0, length);
+        BigInt* i69h = dh_ApowBmodN(extData, exchanger->x, p, length);
+        bi_Assign(y, i69h);
+        bi_Release(&i69h);
+
+        unsigned char* result = malloc(length);
+        memcpy(result, y->buffer, length);
+
+        bi_Release(&y);
+        bi_Release(&extData);
+        bi_Release(&p);
+        return result;
+    }
+
+    return NULL;
 }

@@ -21,24 +21,17 @@
 #ifndef PROVISIONING_DAEMON_H_
 #define PROVISIONING_DAEMON_H_
 
-#include <stdbool.h>
+typedef struct {
+    int tcpPort;
+    const char *defaultRouteUri;
+    const char *bootstrapUri;
+    const char *dnsServer;
+    const char *endPointNamePattern;
+    int logLevel;
+    int localProvisionControl;
+    int remoteProvisionControl;
+} pd_Config;
 
-/**
- * @brief Gets current id of selected clicker. If no clicker is selected -1 is returned.
- * @return id of selected clicker
- */
-int pd_GetSelectedClickerId(void);
-
-/**
- * @brief Request start of provision on currently selected clicker.
- * @return true if provision was started, otherwise false
- */
-bool pd_StartProvision(void);
-
-/**
- * @brief Tries to change selection of clicker.
- * @return id of newly selected clicker
- */
-int pd_SetSelectedClicker(int clickerId);
+extern pd_Config _PDConfig;
 
 #endif /* PROVISIONING_DAEMON_H_ */

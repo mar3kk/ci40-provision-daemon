@@ -43,7 +43,7 @@
  * @param[out] outputSize size of returned encrypted buffer
  * @return pointer to buffer with encrypted data.
  */
-uint8_t* softap_encodeBytes(uint8_t* src, uint8_t len, uint8_t* key_n_iv, uint8_t* outputSize);
+uint8_t* softap_EncodeBytes(uint8_t* src, uint8_t len, uint8_t* key_n_iv, uint8_t* outputSize);
 
 /**
  * @brief Decode data encoded by encodeBytes function. Result of decryption is placed into this same source buffer.
@@ -51,6 +51,6 @@ uint8_t* softap_encodeBytes(uint8_t* src, uint8_t len, uint8_t* key_n_iv, uint8_
  * @param[in] len size of encrypted data
  * @param[in] key_n_iv Key used in encryption, it should be 32 bytes long
  */
-void softap_decodeBytes(uint8_t* data, uint8_t len, uint8_t* key_n_iv);
+void softap_DecodeBytes(uint8_t* data, uint8_t len, uint8_t* key_n_iv);
 
 #endif

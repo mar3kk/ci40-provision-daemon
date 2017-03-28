@@ -40,62 +40,62 @@ typedef struct {
 } BigInt;
 
 //Various constructors
-BigInt* bi_create(uint8_t* buf, int length);
-BigInt* bi_createFromLong(long i, int length);
-BigInt* bi_clone(BigInt* bi);
+BigInt* bi_Create(uint8_t* buf, int length);
+BigInt* bi_CreateFromLong(long i, int length);
+BigInt* bi_Clone(BigInt* bi);
 
 //destructor
-void bi_release(BigInt** bi);
+void bi_Release(BigInt** bi);
 
 /**
  * @brief Returns true if b1 == b2 - false otherwise.
  */
-bool bi_equal(BigInt* b1, BigInt* b2);
+bool bi_Equal(BigInt* b1, BigInt* b2);
 
 /**
  * @brief Returns true if parameter is even number - false otherwise.
  */
-bool bi_isEvenNumber(BigInt* bi);
+bool bi_IsEvenNumber(BigInt* bi);
 
 /**
  * @brief Addition assignment operator.
  */
-void bi_add(BigInt* b1, BigInt* b2);
+void bi_Add(BigInt* b1, BigInt* b2);
 
 /**
  * @brief Subtraction assignment operator.
  */
-void bi_sub(BigInt* b1, BigInt* b2);
+void bi_Sub(BigInt* b1, BigInt* b2);
 
 /**
  * @brief Multiplication assignment operator.
  */
-void bi_multiply(BigInt* b1, BigInt* b2);
+void bi_Multiply(BigInt* b1, BigInt* b2);
 
 /**
  * @brief Division assignment operator.
  */
-void bi_divide(BigInt* b1, BigInt* b2);
+void bi_Divide(BigInt* b1, BigInt* b2);
 
 /**
  * @brief Modulo assignment operator.
  */
-void bi_modulo(BigInt* b1, BigInt* b2);
+void bi_Modulo(BigInt* b1, BigInt* b2);
 
 /**
  * @brief (a mod b) assignment operator.
  */
-void bi_multiplyAmodB(BigInt* bi, BigInt* a, BigInt* b);
+void bi_MultiplyAmodB(BigInt* bi, BigInt* a, BigInt* b);
 
 /**
  * @brief Allocates some constants which speedup calculations
  */
-void bi_generateConst();
+void bi_GenerateConst();
 
-void bi_assign(BigInt* b1, BigInt* b2);
+void bi_Assign(BigInt* b1, BigInt* b2);
 
 /**
  * @brief Release constants allocated by bi_generateConst
  */
-void bi_releaseConst();
+void bi_ReleaseConst();
 #endif /* __BIGINT_H__ */

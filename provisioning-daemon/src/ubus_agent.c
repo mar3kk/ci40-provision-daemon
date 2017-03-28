@@ -30,12 +30,13 @@
 #include <string.h>
 #include <semaphore.h>
 #include <sys/prctl.h>
+#include <glib.h>
 
-#include "log.h"
 #include "clicker.h"
-#include "provisioning_daemon.h"
+#include "controls.h"
 #include "provision_history.h"
 #include "utils.h"
+#include "commands.h"
 
 //forward declarations
 static int GetStateMethodHandler(struct ubus_context *ctx, struct ubus_object *obj, struct ubus_request_data *req,
@@ -47,16 +48,27 @@ static int SelectMethodHandler(struct ubus_context *ctx, struct ubus_object *obj
 static int StartProvisionMethodHandler(struct ubus_context *ctx, struct ubus_object *obj, struct ubus_request_data *req,
         const char *method, struct blob_attr *msg);
 
+static int SetClickerNameMethodHandler(struct ubus_context *ctx, struct ubus_object *obj, struct ubus_request_data *req,
+        const char *method, struct blob_attr *msg);
+
 //variables & structs
+typedef struct {
+    int clickerId;
+    bool toDelete;
+    struct ubus_request request;
+    struct blob_buf replyBloob;
+} UBusMemoryBlock;
+
 static struct ubus_context *_UbusCTX;
 static pthread_t _UbusThread;
 static char *_Path;
-static struct blob_buf replyBloob;
-static sem_t semaphore;
-static bool uBusRunning;
-static bool uBusInterruption;
-static bool uBusInInterState;
-struct uloop_timeout uBusHelperProcess;
+static GMutex _Mutex;
+static bool _UBusRunning = false;
+static bool _UBusInterruption = false;
+static bool _UBusInInterState = false;
+struct uloop_timeout _UBusHelperProcess;
+//holds UBusMemoryBlock elements
+GSList* _UBusRequestMemory = NULL;
 
 static const struct blobmsg_policy _GetStatePolicy[] = {
 };
@@ -73,12 +85,26 @@ static const struct blobmsg_policy _SelectPolicy[] = {
 };
 
 static const struct blobmsg_policy _StartProvisionPolicy[] = {
+    [SELECT_CLICKER_ID] = { .name = "clickerID", .type = BLOBMSG_TYPE_INT32 },
 };
+
+enum {
+     SET_CLICKER_NAME_CLICKER_ID,
+     SET_CLICKER_NAME_CLICKER_NAME,
+
+     SET_CLICKER_NAME_LAST
+ };
+
+ static const struct blobmsg_policy _SetClickerNamePolicy[] = {
+     [SET_CLICKER_NAME_CLICKER_ID] = {.name = "clickerID", .type = BLOBMSG_TYPE_INT32 },
+     [SET_CLICKER_NAME_CLICKER_NAME] = {.name = "clickerName", .type = BLOBMSG_TYPE_STRING }
+ };
 
 static const struct ubus_method _UBusAgentMethods[] = {
     UBUS_METHOD("getState", GetStateMethodHandler, _GetStatePolicy),
     UBUS_METHOD("select", SelectMethodHandler, _SelectPolicy),
-    UBUS_METHOD("startProvision", StartProvisionMethodHandler, _StartProvisionPolicy)
+    UBUS_METHOD("startProvision", StartProvisionMethodHandler, _StartProvisionPolicy),
+    UBUS_METHOD("setClickerName", SetClickerNameMethodHandler, _SetClickerNamePolicy)
 };
 
 static struct ubus_object_type _UBusAgentObjectType = UBUS_OBJECT_TYPE("provisioning-daemon", _UBusAgentMethods);
@@ -106,6 +132,64 @@ static const struct blobmsg_policy _GeneratePskResponsePolicy[GENERATE_PSK_RESPO
     [GENERATE_PSK_RESPONSE_ERROR] = {.name = "error", .type = BLOBMSG_TYPE_STRING},
 };
 
+static UBusMemoryBlock* CreateUBusMemoryBlock() {
+    //Note: Should be called from critical section
+    UBusMemoryBlock* result = g_malloc0(sizeof(UBusMemoryBlock));
+    _UBusRequestMemory = g_slist_prepend(_UBusRequestMemory, result);
+    memset(&result->replyBloob, 0, sizeof(result->replyBloob));
+    blob_buf_init(&result->replyBloob, 0);
+    result->toDelete = false;
+    return result;
+}
+
+static void ReleaseUBusMemoryBlock(UBusMemoryBlock* block) {
+    //Note: Should be called from critical section
+    _UBusRequestMemory = g_slist_remove(_UBusRequestMemory, block);
+    blob_buf_free(&block->replyBloob);
+    g_free(block);
+}
+
+static int SetClickerNameMethodHandler(struct ubus_context *ctx, struct ubus_object *obj, struct ubus_request_data *req,
+        const char *method, struct blob_attr *msg) {
+
+    g_debug("uBusAgent: Requested SetClickerName");
+
+    struct blob_attr *args[SET_CLICKER_NAME_LAST];
+
+    blobmsg_parse(_SetClickerNamePolicy, SET_CLICKER_NAME_LAST, args, blob_data(msg), blob_len(msg));
+
+    int clickerID;
+    if (args[SET_CLICKER_NAME_CLICKER_ID]) {
+        clickerID = blobmsg_get_u32(args[SET_CLICKER_NAME_CLICKER_ID]);
+    } else {
+        return 1;
+    }
+
+    Clicker *clicker = clicker_AcquireOwnership(clickerID);
+    if (clicker == NULL) {
+        g_critical("uBusAgent: No clicker with id %d", clickerID);
+        return UBUS_STATUS_NO_DATA;
+    }
+
+    char *clickerName;
+    if (args[SET_CLICKER_NAME_CLICKER_NAME]) {
+        clickerName = blobmsg_get_string(args[SET_CLICKER_NAME_CLICKER_NAME]);
+    } else {
+        clicker_ReleaseOwnership(clicker);
+        return UBUS_STATUS_NO_DATA;
+    }
+
+    g_free(clicker->name);
+    int size = strlen(clickerName);
+    size = size > COMMAND_ENDPOINT_NAME_LENGTH ? COMMAND_ENDPOINT_NAME_LENGTH : size;
+    clicker->name = g_malloc( size );
+    strlcpy(clicker->name, clickerName, COMMAND_ENDPOINT_NAME_LENGTH);
+
+    clicker_ReleaseOwnership(clicker);
+
+    return UBUS_STATUS_OK;
+}
+
 static int SelectMethodHandler(struct ubus_context *ctx, struct ubus_object *obj, struct ubus_request_data *req,
         const char *method, struct blob_attr *msg)
 {
@@ -115,71 +199,78 @@ static int SelectMethodHandler(struct ubus_context *ctx, struct ubus_object *obj
     blobmsg_parse(_SelectPolicy, ARRAY_SIZE(_SelectPolicy), argBuffer, blob_data(msg), blob_len(msg));
 
     uint32_t clickerId = 0xffffffff;
-    if (argBuffer[SELECT_CLICKER_ID])
+    if (argBuffer[SELECT_CLICKER_ID]) {
         clickerId = blobmsg_get_u32(argBuffer[SELECT_CLICKER_ID]);
+    } else {
+        return UBUS_STATUS_NO_DATA;
+    }
 
-    LOG(LOG_DBG, "uBusAgent: Select, move to clickerId:%d", clickerId);
+    g_info("uBusAgent: Select, move to clickerId:%d", clickerId);
 
-    int returnedId = pd_SetSelectedClicker(clickerId);
-    LOG(LOG_INFO, "uBusAgent: Tried to move to index %d, result is:%d", clickerId, returnedId);
+    event_PushEventWithInt(EventType_CLICKER_SELECT, clickerId);
 
-    return returnedId == clickerId ? UBUS_STATUS_OK : UBUS_STATUS_INVALID_ARGUMENT;
+    return UBUS_STATUS_OK;
 }
 
 static int StartProvisionMethodHandler(struct ubus_context *ctx, struct ubus_object *obj, struct ubus_request_data *req,
         const char *method, struct blob_attr *msg)
 {
+    struct blob_attr* argBuffer[SELECT_LAST_ENUM];
 
-    LOG(LOG_DBG, "uBusAgent: Requested StartProvision");
+    blobmsg_parse(_StartProvisionPolicy, ARRAY_SIZE(_StartProvisionPolicy), argBuffer, blob_data(msg), blob_len(msg));
 
-    //handle startProvision
-    int ret = pd_StartProvision();
-    LOG(LOG_INFO, "uBusAgent: Start provision result: %d (0 = ok)", ret);
+    uint32_t clickerId = 0xffffffff;
+    if (argBuffer[SELECT_CLICKER_ID]) {
+        clickerId = blobmsg_get_u32(argBuffer[SELECT_CLICKER_ID]);
+    } else {
+        clickerId = controls_GetSelectedClickerId();
+    }
+    g_info("uBusAgent: Requested StartProvision, clicker id: %d", clickerId);
+    event_PushEventWithInt(EventType_CLICKER_START_PROVISION, clickerId);
 
-    return ret;
+    return UBUS_STATUS_OK;
 }
 
 static int GetStateMethodHandler(struct ubus_context *ctx, struct ubus_object *obj, struct ubus_request_data *req,
         const char *method, struct blob_attr *msg)
 {
-    LOG(LOG_DBG, "uBusAgent: Requested GetState");
+    //g_debug("uBusAgent: Requested GetState");
 
-    unsigned int clickersCount = clicker_GetClickersCount();
-    int selClickerId = pd_GetSelectedClickerId();
-    LOG(LOG_DBG, "uBusAgent: GetState clicker count:%d, selected id:%d", clickersCount, selClickerId);
+    GArray* connectedClickers = controls_GetAllClickersIds();
+    int selClickerId = controls_GetSelectedClickerId();
+    //g_debug("uBusAgent: GetState clicker count:%d, selected id:%d", connectedClickers->len, selClickerId);
 
     //add history data
-    int historyCount = 0;
-    HistoryItem* history = NULL;
-    history_GetProvisioned(&history, &historyCount);
-
+    GArray* historyItems = history_GetProvisioned();
+    struct blob_buf replyBloob = {0, NULL, 0, NULL};
     blob_buf_init(&replyBloob, 0);
     void* cookie_array = blobmsg_open_array(&replyBloob, "clickers");
-    for(int t = 0; t < historyCount; t++)
+    for(int t = 0; t < historyItems->len; t++)
     {
         void* cookie_item = blobmsg_open_table(&replyBloob, "clicker");
-
-        blobmsg_add_u32(&replyBloob, "id", history[t].id);
-        blobmsg_add_string(&replyBloob, "name", history[t].name);
+        HistoryItem* history = &g_array_index(historyItems, HistoryItem, t);
+        blobmsg_add_u32(&replyBloob, "id", history->id);
+        blobmsg_add_string(&replyBloob, "name", history->name);
         blobmsg_add_u8(&replyBloob, "selected", false);
         blobmsg_add_u8(&replyBloob, "inProvisionState", false);
         blobmsg_add_u8(&replyBloob, "isProvisioned", true);
-        blobmsg_add_u8(&replyBloob, "isError", false);
+        blobmsg_add_u8(&replyBloob, "isError", history->isErrored);
         blobmsg_close_table(&replyBloob, cookie_item);
     }
 
     bool alreadyProvisioned = false;
 
-    for(int t = 0; t < clickersCount; t++)
+    for(int t = 0; t < connectedClickers->len; t++)
     {
-        Clicker* clk = clicker_AcquireOwnershipAtIndex(t);
+        Clicker* clk = clicker_AcquireOwnership( g_array_index(connectedClickers, int, t) );
         if (clk == NULL)
             continue;
 
         alreadyProvisioned = false;
-        for(int j = 0; j < historyCount; j++)
+        for(int j = 0; j < historyItems->len; j++)
         {
-            if (history[j].id == clk->clickerID)
+            HistoryItem* history = &g_array_index(historyItems, HistoryItem, j);
+            if (history->id == clk->clickerID)
             {
                 alreadyProvisioned = true;
                 break;
@@ -204,7 +295,8 @@ static int GetStateMethodHandler(struct ubus_context *ctx, struct ubus_object *o
 
         clicker_ReleaseOwnership(clk);
     }
-    FREE_AND_NULL(history);
+    g_array_free(historyItems, TRUE);
+    g_array_free(connectedClickers, TRUE);
     blobmsg_close_array(&replyBloob, cookie_array);
 
     ubus_send_reply(ctx, req, replyBloob.head);
@@ -214,93 +306,139 @@ static int GetStateMethodHandler(struct ubus_context *ctx, struct ubus_object *o
 
 static void GeneratePskResponseHandler(struct ubus_request *req, int type, struct blob_attr *msg)
 {
+    g_critical("Got: %p", msg);
     struct blob_attr *args[GENERATE_PSK_RESPONSE_MAX];
 
     blobmsg_parse(_GeneratePskResponsePolicy, GENERATE_PSK_RESPONSE_MAX, args, blob_data(msg), blob_len(msg));
-    pdubus_GeneratePskCallback callback = ((pdubus_GeneratePskRequest*)req->priv)->callback;
+    UBusMemoryBlock* block = (UBusMemoryBlock*)req->priv;
 
-    char *error = blobmsg_get_string(args[GENERATE_PSK_RESPONSE_ERROR]);
-    if (error)
-    {
-        LOG(LOG_ERR, "uBusAgent: Error while generating PSK : %s", error);
-        callback(NULL, 0, ((pdubus_GeneratePskRequest*)req->priv));
+    char *error = NULL;
+    if (args[GENERATE_PSK_RESPONSE_ERROR]) {
+        error = blobmsg_get_string(args[GENERATE_PSK_RESPONSE_ERROR]);
+    }
+
+    if (error) {
+        g_critical("uBusAgent: Error while generating PSK : %s", error);
+        PreSharedKey* eventData = g_new0(PreSharedKey, 1);
+        eventData->clickerId = block->clickerId;
+        event_PushEventWithPtr(EventType_PSK_OBTAINED, eventData, true);
+        block->toDelete = true;
         return;
     }
 
-    char *psk = blobmsg_get_string(args[GENERATE_PSK_RESPONSE_PSK_SECRET]);
+    char *psk = NULL;
+    if (args[GENERATE_PSK_RESPONSE_PSK_SECRET]) {
+        psk = blobmsg_get_string(args[GENERATE_PSK_RESPONSE_PSK_SECRET]);
+    }
 
-    if (!psk)
-    {
-        LOG(LOG_ERR, "uBusAgent: UNKNOWN PSK");
-        callback(NULL, 0, ((pdubus_GeneratePskRequest*)req->priv));
+    if (!psk) {
+        g_critical("uBusAgent: UNKNOWN PSK");
+        PreSharedKey* eventData = g_new0(PreSharedKey, 1);
+        eventData->clickerId = block->clickerId;
+        event_PushEventWithPtr(EventType_PSK_OBTAINED, eventData, true);
+        block->toDelete = true;
         return;
     }
-    LOG(LOG_INFO, "uBusAgent: Obtained PSK: %s", psk);
-    callback(psk, strlen(psk), ((pdubus_GeneratePskRequest*)req->priv));
 
+    char *identity;
+    if (args[GENERATE_PSK_RESPONSE_PSK_IDENTITY]) {
+        identity = blobmsg_get_string(args[GENERATE_PSK_RESPONSE_PSK_IDENTITY]);
+    }
+
+    if (!identity) {
+        g_critical("uBusAgent: UNKNOWN PSK");
+        PreSharedKey* eventData = g_new0(PreSharedKey, 1);
+        eventData->clickerId = block->clickerId;
+        event_PushEventWithPtr(EventType_PSK_OBTAINED, eventData, true);
+        block->toDelete = true;
+        return;
+    }
+
+    g_message("uBusAgent: Obtained PSK: %s and IDENTITY: %s", psk, identity);
+
+    PreSharedKey* eventData = g_new0(PreSharedKey, 1);
+    eventData->clickerId = block->clickerId;
+
+    strlcpy(eventData->identity, identity, PSK_ARRAYS_SIZE);
+    eventData->identityLen = strlen(identity);
+    eventData->identityLen = eventData->identityLen > PSK_ARRAYS_SIZE ? PSK_ARRAYS_SIZE : eventData->identityLen;
+
+    strlcpy(eventData->psk, psk, PSK_ARRAYS_SIZE);
+    eventData->pskLen = strlen(psk);
+    eventData->pskLen = eventData->pskLen > PSK_ARRAYS_SIZE ? PSK_ARRAYS_SIZE : eventData->pskLen;
+
+    event_PushEventWithPtr(EventType_PSK_OBTAINED, eventData, true);
+    block->toDelete = true;
     return;
 }
 
 void HelperTimeoutHandler(struct uloop_timeout *t)
 {
-    sem_wait(&semaphore);
-    if (uBusInterruption)
+    g_mutex_lock(&_Mutex);
+    if (_UBusInterruption)
         uloop_cancelled = true;
 
-    sem_post(&semaphore);
-    uloop_timeout_set(&uBusHelperProcess, 500);
+    g_mutex_unlock(&_Mutex);
+    uloop_timeout_set(&_UBusHelperProcess, 500);
 }
 
 static void* PDUbusLoop(void *arg)
 {
-    LOG(LOG_INFO, "uBusAgent: uBus thread started.\n");
+    g_message("uBusAgent: uBus thread started.\n");
     while(true)
     {
-        sem_wait(&semaphore);
-        if (uBusRunning == false)
+        g_mutex_lock(&_Mutex);
+        if (_UBusRunning == false)
         {
-            sem_post(&semaphore);
+            g_mutex_unlock(&_Mutex);
             break;
         }
 
-        while(uBusInterruption)
+        while(_UBusInterruption)
         {
-            uBusInInterState = true;
-            LOG(LOG_INFO, "Interrupt state");
-            sem_post(&semaphore);
+            _UBusInInterState = true;
+            g_debug("Interrupt state");
+            g_mutex_unlock(&_Mutex);
             usleep(1000 * 1000);
-            sem_wait(&semaphore);
-            uBusInInterState = false;
+            g_mutex_lock(&_Mutex);
+            _UBusInInterState = false;
         }
-        sem_post(&semaphore);
+        //check for memory removal
+        if (_UBusRequestMemory != NULL) {
+            UBusMemoryBlock* block = (UBusMemoryBlock*)_UBusRequestMemory->data;
+            if ( block->toDelete ) {
+                ReleaseUBusMemoryBlock(block);
+            }
+        }
+        g_mutex_unlock(&_Mutex);
         uloop_run();
     }
-    LOG(LOG_INFO, "uBusAgent: uBus thread finish.\n");
+    g_message("uBusAgent: uBus thread finish.\n");
     return NULL;
 }
 
 static void SetUBusRunning(bool state)
 {
-    sem_wait(&semaphore);
-    uBusRunning = state;
-    sem_post(&semaphore);
+    g_mutex_lock(&_Mutex);
+    _UBusRunning = state;
+    g_mutex_unlock(&_Mutex);
 }
 
 static void SetUBusLoopInterruption(bool state)
 {
-    sem_wait(&semaphore);
-    uBusInterruption = state;
+    g_mutex_lock(&_Mutex);
+    _UBusInterruption = state;
     uloop_cancelled = state;
-    sem_post(&semaphore);
+    g_mutex_unlock(&_Mutex);
 }
 
 static void WaitForInterruptState(void)
 {
     while(true)
     {
-        sem_wait(&semaphore);
-        bool ok = uBusInInterState;
-        sem_post(&semaphore);
+        g_mutex_lock(&_Mutex);
+        bool ok = _UBusInInterState;
+        g_mutex_unlock(&_Mutex);
         if (ok)
             break;
 
@@ -310,27 +448,27 @@ static void WaitForInterruptState(void)
 
 bool ubusagent_Init(void)
 {
-    sem_init(&semaphore, 0, 1);
+    g_mutex_init(&_Mutex);
     uloop_init();
     _UbusCTX = ubus_connect(_Path);
     if (!_UbusCTX)
     {
-        LOG(LOG_ERR, "uBusAgent: Failed to connect to ubus");
+        g_critical("uBusAgent: Failed to connect to ubus");
         return false;
     }
     ubus_add_uloop(_UbusCTX);
 
-    memset(&uBusHelperProcess, 0, sizeof(uBusHelperProcess));
-    uBusHelperProcess.cb = HelperTimeoutHandler;
-    uloop_timeout_set(&uBusHelperProcess, 500);
+    memset(&_UBusHelperProcess, 0, sizeof(_UBusHelperProcess));
+    _UBusHelperProcess.cb = HelperTimeoutHandler;
+    uloop_timeout_set(&_UBusHelperProcess, 500);
 
     SetUBusRunning(true);
     SetUBusLoopInterruption(false);
-    uBusInInterState = false;
+    _UBusInInterState = false;
 
     if (pthread_create(&_UbusThread, NULL, PDUbusLoop, NULL) < 0)
     {
-        LOG(LOG_ERR, "uBusAgent: Error creating thread.");
+        g_critical("uBusAgent: Error creating thread.");
         return false;
     }
     return true;
@@ -340,17 +478,17 @@ bool ubusagent_EnableRemoteControl(void)
 {
     SetUBusLoopInterruption(true);
     WaitForInterruptState();
-    LOG(LOG_INFO, "uBusAgent: Enabling provision control through uBus");
+    g_message("uBusAgent: Enabling provision control through uBus");
     int ret = ubus_add_object(_UbusCTX, &_UBusAgentObject);
     if (ret)
-        LOG(LOG_ERR, "uBusAgent: Failed to add object: %s\n", ubus_strerror(ret));
+        g_critical("uBusAgent: Failed to add object: %s\n", ubus_strerror(ret));
 
     SetUBusLoopInterruption(false);
 
     return ret == 0;
 }
 
-void ubusagent_Close(void)
+void ubusagent_Destroy(void)
 {
     SetUBusLoopInterruption(false);
     SetUBusRunning(false);
@@ -358,31 +496,45 @@ void ubusagent_Close(void)
         ubus_free(_UbusCTX);
 
     uloop_done();
-    sem_destroy(&semaphore);
+
+    while (_UBusRequestMemory != NULL) {
+        UBusMemoryBlock* block = (UBusMemoryBlock*) _UBusRequestMemory->data;
+        if (block->toDelete) {
+            ReleaseUBusMemoryBlock(block);
+        }
+    }
+    g_mutex_clear(&_Mutex);
 }
 
 //Warn: this is blocking call
-bool ubusagent_SendGeneratePskMessage(pdubus_GeneratePskRequest *request)
+bool ubusagent_SendGeneratePskMessage(int clickerId)
 {
     SetUBusLoopInterruption(true);
     WaitForInterruptState();
     uint32_t id, ret;
-    blob_buf_init(&replyBloob, 0);
     ret = ubus_lookup_id(_UbusCTX, "creator", &id);
     if (ret)
     {
-        LOG(LOG_ERR, "uBusAgent: creator ubus service not available");
+        g_critical("uBusAgent: creator ubus service not available");
+        SetUBusLoopInterruption(false);
         return false;
     }
 
-    ret = ubus_invoke(_UbusCTX, id, "generatePsk", replyBloob.head, GeneratePskResponseHandler, (void*)request, 10000);
+    g_mutex_lock(&_Mutex);
+    UBusMemoryBlock* block = CreateUBusMemoryBlock();
+    g_mutex_unlock(&_Mutex);
+    block->clickerId = clickerId;
+    ret = ubus_invoke_async(_UbusCTX, id, "generatePsk", block->replyBloob.head, &block->request);
+    block->request.priv = (void*)block;
+    block->request.data_cb = GeneratePskResponseHandler;
+    ubus_complete_request_async(_UbusCTX, &block->request);
+
     if (ret)
     {
-        LOG(LOG_ERR, "uBusAgent: Filed to invoke generatePsk");
+        g_critical("uBusAgent: Filed to invoke generatePsk");
+        SetUBusLoopInterruption(false);
         return false;
     }
-    blob_buf_free(&replyBloob);
     SetUBusLoopInterruption(false);
-
     return true;
 }

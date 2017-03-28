@@ -33,7 +33,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/time.h>
-
+#include <glib.h>
 
 static const char chars[] = {
     '0', '1', '2', '3', '4', '5', '6', '7',
@@ -54,7 +54,7 @@ static int itoa(unsigned int num, char* str, int len, int base)
         return -1;
     do
     {
-        printf("i : %d , index : %d \n", i, sum%base);
+        //printf("i : %d , index : %d \n", i, sum%base);
         str[i++] = chars[sum%base];
 
         sum /= base;
@@ -63,13 +63,6 @@ static int itoa(unsigned int num, char* str, int len, int base)
         return -1;
     str[i] = '\0';
     return 0;
-}
-
-unsigned long GetCurrentTimeMillis(void)
-{
-    struct timeval _Timeval;
-    gettimeofday(&_Timeval, NULL);
-    return _Timeval.tv_sec * 1000 + _Timeval.tv_usec/1000;
 }
 
 void HexStringToByteArray(const char* hexstr, uint8_t * dst, size_t len)
@@ -81,18 +74,17 @@ void HexStringToByteArray(const char* hexstr, uint8_t * dst, size_t len)
 
 bool GenerateRandomX(unsigned char* array, int length)
 {
-    unsigned long seed = GetCurrentTimeMillis();
-    srand(seed);
+    if (array == NULL) return false;
 
     for (int i = 0; i < length; ++i)
-        array[i] = rand() % 9;
+        array[i] = g_random_int() % 9;
 
-  return true;
+    return true;
 }
 
 void GenerateClickerTimeHash(char *buffer)
 {
-    unsigned long currentTimeSeconds = GetCurrentTimeMillis() / 1000;
+    gint64 currentTimeSeconds = g_get_monotonic_time() / (1000 * 1000);
     itoa(currentTimeSeconds, buffer, 10, 52);
 }
 

@@ -44,8 +44,8 @@ function getProvisioningDaemonState()
 
 end
 
-function startProvisioning()
-    local res, status = conn:call("provisioning-daemon", "startProvision", {})
+function startProvisioning(clickerID)
+    local res, status = conn:call("provisioning-daemon", "startProvision", {clickerID = clickerID})
     if (status == nil) then
         return true
     end

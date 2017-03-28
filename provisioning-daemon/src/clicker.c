@@ -30,272 +30,167 @@
 
 #include "clicker.h"
 #include "utils.h"
-#include "log.h"
 #include "commands.h"
-
+#include "crypto/crypto_config.h"
 #include <stdlib.h>
-#include <semaphore.h>
 #include <time.h>
 #include <stdbool.h>
+#include <glib.h>
 
 /**
  * Keeps a HEAD for the list of connected clickers
  */
-static Clicker *clickers = NULL;
+static GQueue* _ClickersQueue = NULL;
 
-/**
- * Keeps a HEAD to list of clickers that are ready to be purged
- */
-static Clicker *clickersToRelease = NULL;
+/** All operations are sync on this mutex */
+static GMutex _Mutex;
 
-static sem_t semaphore;
-static int _IDCounter = 0;
-
-
-static void Destroy(Clicker *clicker)
-{
-    dh_release(&clicker->keysExchanger);
-    FREE_AND_NULL(clicker->localKey);
-    FREE_AND_NULL(clicker->remoteKey);
-    FREE_AND_NULL(clicker->sharedKey);
-    FREE_AND_NULL(clicker->psk);
-    FREE_AND_NULL(clicker->name);
-    FREE_AND_NULL(clicker);
+static void Destroy(Clicker *clicker) {
+    dh_Release(&clicker->keysExchanger);
+    G_FREE_AND_NULL(clicker->localKey);
+    G_FREE_AND_NULL(clicker->remoteKey);
+    G_FREE_AND_NULL(clicker->sharedKey);
+    G_FREE_AND_NULL(clicker->psk);
+    G_FREE_AND_NULL(clicker->identity);
+    G_FREE_AND_NULL(clicker->name);
+    g_mutex_clear(&clicker->ownershipLock);
+    G_FREE_AND_NULL(clicker);
 }
 
-static void InnerAdd(Clicker **head, Clicker *clicker)
-{
-    sem_wait(&semaphore);
-    if (*head == NULL)
-    {
-        *head = clicker;
-        (*head)->next = NULL;
-        sem_post(&semaphore);
+static void ReleaseClickerIfNotOwned(Clicker* clicker) {
+    //NOTE: Should be called in critical section only!
+    if (clicker->ownershipsCount > 0) {
         return;
     }
-    Clicker * current = *head;
-    while (current->next != NULL)
-    {
-        current = current->next;
+    //check for logic error, if ownershipCount == 0, this clicker can't be in clickersQueue
+    if (g_queue_remove(_ClickersQueue, clicker) == TRUE) {
+        g_critical("Internal error: Clicker with id:%d has ownershipCount = 0, but it's still in queue! Forced remove",
+                clicker->clickerID);
     }
-    current->next = clicker;
-    clicker->next = NULL;
-    sem_post(&semaphore);
+    Destroy(clicker);
 }
 
-static void InnerRemove(Clicker **head, Clicker *clicker, bool doLock)
-{
-    if (doLock)
-        sem_wait(&semaphore);
-
-    Clicker* current = *head;
-    Clicker* previous = NULL;
-
-    if (*head == NULL)
-    {
-        if (doLock)
-            sem_post(&semaphore);
-        return;
-    }
-
-    while (current != clicker)
-    {
-        if (current->next == NULL){
-            if (doLock)
-                sem_post(&semaphore);
-            return;
-        }
-        else {
-            previous = current;
-            current = current->next;
-        }
-    }
-
-    if (current == *head)
-        *head = current->next;
-    else
-        previous->next = current->next;
-
-    if (doLock)
-        sem_post(&semaphore);
+gint CompareClickerById(gpointer a, gpointer b) {
+    Clicker* clicker1 = (Clicker*)a;
+    Clicker* clicker2 = (Clicker*)b;
+    return clicker1->clickerID - clicker2->clickerID;
 }
 
 static Clicker *InnerGetClickerByID(int id, bool doLock)
 {
     if (doLock)
-        sem_wait(&semaphore);
-    Clicker *ptr = clickers;
-    while (ptr != NULL)
-    {
-        if (ptr->clickerID == id)
-        {
-            if (doLock)
-                sem_post(&semaphore);
-            return ptr;
-        }
-        ptr = ptr->next;
-    }
+        g_mutex_lock(&_Mutex);
+
+    Clicker tmp;
+    tmp.clickerID = id;
+    GList* found = g_queue_find_custom(_ClickersQueue, &tmp, (GCompareFunc)CompareClickerById);
+    Clicker* result = found != NULL ? found->data : NULL;
+
     if (doLock)
-        sem_post(&semaphore);
-    return NULL;
+        g_mutex_unlock(&_Mutex);
+    return result;
 }
 
-
-Clicker *clicker_New(int socket)
+void CreateNewClicker(int id)
 {
-    Clicker *newClicker = malloc(sizeof(Clicker));
+    Clicker *newClicker = g_new0(Clicker, 1);
 
-    newClicker->socket = socket;
-    newClicker->clickerID = ++_IDCounter;
-    newClicker->lastKeepAliveTime = GetCurrentTimeMillis();
+    newClicker->clickerID = id;
     newClicker->taskInProgress = false;
-    newClicker->next = NULL;
-    newClicker->keysExchanger = NULL;
+    newClicker->keysExchanger = dh_NewKeyExchanger((char*)g_KeyBuffer, P_MODULE_LENGTH, CRYPTO_G_MODULE, GenerateRandomX);
     newClicker->localKey = NULL;
     newClicker->remoteKey = NULL;
     newClicker->sharedKey = NULL;
     newClicker->psk = NULL;
+    newClicker->pskLen = 0;
+    newClicker->identity = NULL;
     newClicker->ownershipsCount = 0;
     newClicker->provisionTime = 0;
     newClicker->error = 0;
     newClicker->provisioningInProgress = false;
-    newClicker->name = malloc(COMMAND_ENDPOINT_NAME_LENGTH);
+    newClicker->name = g_malloc0(COMMAND_ENDPOINT_NAME_LENGTH);
+    g_mutex_init(&newClicker->ownershipLock);
 
-    InnerAdd(&clickers, newClicker);
-    return newClicker;
+    g_mutex_lock(&_Mutex);
+    g_queue_push_tail(_ClickersQueue, newClicker);
+    newClicker->ownershipsCount ++;
+    g_mutex_unlock(&_Mutex);
 }
 
-void clicker_InitSemaphore(void)
+void RemoveFromCollection(int clickerID)
 {
-    sem_init(&semaphore, 0, 1);
-}
-
-void clicker_Release(Clicker *clicker)
-{
-    LOG(LOG_DBG, "clicker_Release start");
-    InnerRemove(&clickers, clicker, true);
-
-    InnerAdd(&clickersToRelease, clicker);
-}
-
-//should be called in critical section
-Clicker *clicker_InnerGetClickerAtIndex(int index)
-{
-    int i = -1;
-    Clicker *ptr = clickers;
-    while (ptr != NULL)
-    {
-        i++;
-        if (i == index)
-            return ptr;
-
-        ptr = ptr->next;
+    Clicker* clicker = InnerGetClickerByID(clickerID, true);
+    if (clicker == NULL) {
+        return;
     }
-    return NULL;
+    g_debug("clicker_Release start");
+    g_mutex_lock(&_Mutex);
+
+    if (g_queue_remove(_ClickersQueue, clicker) == TRUE) {
+        clicker->ownershipsCount --;
+    } else {
+        g_critical("Internal error: Tried to remove clicker which is not a part of collection!");
+    }
+
+    ReleaseClickerIfNotOwned(clicker);
+    g_mutex_unlock(&_Mutex);
 }
 
-Clicker *clicker_GetClickerAtIndex(int index)
+void clicker_Init(void)
 {
-    sem_wait(&semaphore);
-    Clicker* result = clicker_InnerGetClickerAtIndex(index);
-    sem_post(&semaphore);
-    return result;
+    _ClickersQueue = g_queue_new();
+    g_mutex_init(&_Mutex);
+}
+
+void clicker_Shutdown(void) {
+    g_queue_free(_ClickersQueue);
+    g_mutex_clear(&_Mutex);
+    _ClickersQueue = NULL;
 }
 
 unsigned int clicker_GetClickersCount(void)
 {
-    sem_wait(&semaphore);
-    int i = 0;
-    Clicker *ptr = clickers;
-    while (ptr != NULL)
-    {
-        i++;
-        ptr = ptr->next;
-    }
-    sem_post(&semaphore);
-    return i;
-}
-
-Clicker *clicker_GetClickerByID(int id)
-{
-    return InnerGetClickerByID(id, true);
-}
-
-int clicker_GetIndexOfClicker(Clicker* clicker)
-{
-    int t = sem_trywait(&semaphore);
-    if (t == 0)
-        sem_post(&semaphore);
-    sem_wait(&semaphore);
-    int i = -1;
-    Clicker *head = clickers;
-    while (head != NULL)
-    {
-        i++;
-        if (clicker == head)
-        {
-            sem_post(&semaphore);
-            return i;
-        }
-        head = head->next;
-    }
-    sem_post(&semaphore);
-    return -1;
-}
-
-Clicker *clicker_GetClickers(void)
-{
-    return clickers;
+    g_mutex_lock(&_Mutex);
+    int result = g_queue_get_length(_ClickersQueue);
+    g_mutex_unlock(&_Mutex);
+    return result;
 }
 
 Clicker *clicker_AcquireOwnership(int clickerID)
 {
-    sem_wait(&semaphore);
+    g_mutex_lock(&_Mutex);
     Clicker *clicker = InnerGetClickerByID(clickerID, false);
     if (clicker != NULL)
         clicker->ownershipsCount++;
-    sem_post(&semaphore);
+    g_mutex_unlock(&_Mutex);
 
-    return clicker;
-}
-
-Clicker* clicker_AcquireOwnershipAtIndex(int index)
-{
-    sem_wait(&semaphore);
-
-    Clicker* clicker = clicker_InnerGetClickerAtIndex(index);
     if (clicker != NULL)
-        clicker->ownershipsCount++;
-
-    sem_post(&semaphore);
+        g_mutex_lock(&clicker->ownershipLock);
 
     return clicker;
 }
 
 void clicker_ReleaseOwnership(Clicker *clicker)
 {
-    sem_wait(&semaphore);
+    g_mutex_unlock(&clicker->ownershipLock);
+    g_mutex_lock(&_Mutex);
     clicker->ownershipsCount--;
-    sem_post(&semaphore);
+    ReleaseClickerIfNotOwned(clicker);
+    g_mutex_unlock(&_Mutex);
 }
 
-void clicker_Purge(void)
-{
-    sem_wait(&semaphore);
-    Clicker *current = clickersToRelease;
-    while (current != NULL)
-    {
-        if (current->ownershipsCount <= 0)
-        {
-            Clicker *tmp = current->next;
-            InnerRemove(&clickersToRelease, current, false);
-            Destroy(current);
-            current = tmp;
-        }
-        else
-        {
-            current = current->next;
-        }
+bool clicker_ConsumeEvent(Event* event) {
+    switch(event->type) {
+        case EventType_CLICKER_CREATE:
+            CreateNewClicker(event->intData);
+            return true;
+
+        case EventType_CLICKER_DESTROY:
+            RemoveFromCollection(event->intData);
+            return true;
+
+        default:
+            break;
     }
-    sem_post(&semaphore);
+    return false;
 }
