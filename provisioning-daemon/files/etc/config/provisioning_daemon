@@ -6,7 +6,7 @@ PORT=49300
 
 #Turns on/off possibility to control provision process through uBus commands.
 #Default value is false
-REMOTE_PROVISION_CTRL=false
+REMOTE_PROVISION_CTRL=true
 
 #Turns on/off possibility to control provision process through buttons on ci40.
 #Default value is true

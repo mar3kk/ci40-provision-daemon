@@ -107,6 +107,8 @@ GMutex _LogMutex;
 static void CtrlCHandler(int signal)
 {
     g_message("Exit triggered...");
+    fflush(stdout);
+    fflush(stderr);
     _KeepRunning = false;
 }
 

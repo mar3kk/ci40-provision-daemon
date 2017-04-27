@@ -74,7 +74,6 @@ static void GenerateSharedClickerKey(int clickerId)
     PRINT_BYTES(clicker->sharedKey, clicker->sharedKeyLength);
 
     clicker_ReleaseOwnership(clicker);
-
     event_PushEventWithInt(EventType_TRY_TO_SEND_PSK_TO_CLICKER, clickerId);
 }
 
@@ -195,7 +194,6 @@ static void ObtainedPSK(PreSharedKey* pskData) {
     strlcpy((char*)clicker->identity, pskData->identity, pskData->identityLen + 1);
 
     clicker_ReleaseOwnership(clicker);
-
     event_PushEventWithInt(EventType_HISTORY_ADD, pskData->clickerId);
     event_PushEventWithInt(EventType_TRY_TO_SEND_PSK_TO_CLICKER, pskData->clickerId);
 }

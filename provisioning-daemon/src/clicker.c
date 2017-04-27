@@ -32,6 +32,7 @@
 #include "utils.h"
 #include "commands.h"
 #include "crypto/crypto_config.h"
+#include <pthread.h>
 #include <stdlib.h>
 #include <time.h>
 #include <stdbool.h>
@@ -46,6 +47,7 @@ static GQueue* _ClickersQueue = NULL;
 static GMutex _Mutex;
 
 static void Destroy(Clicker *clicker) {
+    g_message("clicker destroy called %p", clicker);
     dh_Release(&clicker->keysExchanger);
     G_FREE_AND_NULL(clicker->localKey);
     G_FREE_AND_NULL(clicker->remoteKey);
@@ -58,6 +60,7 @@ static void Destroy(Clicker *clicker) {
 }
 
 static void ReleaseClickerIfNotOwned(Clicker* clicker) {
+
     //NOTE: Should be called in critical section only!
     if (clicker->ownershipsCount > 0) {
         return;
@@ -166,7 +169,6 @@ Clicker *clicker_AcquireOwnership(int clickerID)
 
     if (clicker != NULL)
         g_mutex_lock(&clicker->ownershipLock);
-
     return clicker;
 }
 

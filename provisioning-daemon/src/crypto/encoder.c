@@ -55,7 +55,9 @@ uint8_t* softap_EncodeBytes(uint8_t* src, uint8_t len, uint8_t* key, uint8_t* ou
     for (t = 0; t < paddedSize; t += 16) {
         IV[15] = t / 16;
         for (y = 0; y < 16; y++) {
-            src[t + y] ^= IV[y];
+            if (t + y < len) {
+                src[t + y] ^= IV[y];
+            }
         }
         rijndael_encrypt(&ctx, src + t, result + t);
     }

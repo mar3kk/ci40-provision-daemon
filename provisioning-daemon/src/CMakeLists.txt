@@ -2,6 +2,7 @@
 ########################
 file (GLOB src *.c*)
 ADD_EXECUTABLE(provisioning_daemon_appd ${src})
+
 # Add library targets
 #####################
 FIND_LIBRARY(LIB_LMC libletmecreate_core.so ${STAGING_DIR}/usr/lib)
